@@ -1,886 +1,886 @@
-#!/usr/bin/env python
-
-# repo default configuration
-#
-import os
-REPO_URL = os.environ.get('REPO_URL', None)
-if not REPO_URL:
-  REPO_URL = 'https://gerrit.googlesource.com/git-repo'
-REPO_REV = 'stable'
-
-# Copyright (C) 2008 Google Inc.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-# increment this whenever we make important changes to this script
-VERSION = (1, 23)
-
-# increment this if the MAINTAINER_KEYS block is modified
-KEYRING_VERSION = (1, 2)
-
-# Each individual key entry is created by using:
-# gpg --armor --export keyid
-MAINTAINER_KEYS = """
-
-     Repo Maintainer <repo@android.kernel.org>
------BEGIN PGP PUBLIC KEY BLOCK-----
-Version: GnuPG v1.4.2.2 (GNU/Linux)
-
-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
-=CMiZ
------END PGP PUBLIC KEY BLOCK-----
-
-     Conley Owens <cco3@android.com>
------BEGIN PGP PUBLIC KEY BLOCK-----
-Version: GnuPG v1.4.11 (GNU/Linux)
-
-mQENBFHRvc8BCADFg45Xx/y6QDC+T7Y/gGc7vx0ww7qfOwIKlAZ9xG3qKunMxo+S
-hPCnzEl3cq+6I1Ww/ndop/HB3N3toPXRCoN8Vs4/Hc7by+SnaLFnacrm+tV5/OgT
-V37Lzt8lhay1Kl+YfpFwHYYpIEBLFV9knyfRXS/428W2qhdzYfvB15/AasRmwmor
-py4NIzSs8UD/SPr1ihqNCdZM76+MQyN5HMYXW/ALZXUFG0pwluHFA7hrfPG74i8C
-zMiP7qvMWIl/r/jtzHioH1dRKgbod+LZsrDJ8mBaqsZaDmNJMhss9g76XvfMyLra
-9DI9/iFuBpGzeqBv0hwOGQspLRrEoyTeR6n1ABEBAAG0H0NvbmxleSBPd2VucyA8
-Y2NvM0BhbmRyb2lkLmNvbT6JATgEEwECACIFAlHRvc8CGwMGCwkIBwMCBhUIAgkK
-CwQWAgMBAh4BAheAAAoJEGe35EhpKzgsP6AIAJKJmNtn4l7hkYHKHFSo3egb6RjQ
-zEIP3MFTcu8HFX1kF1ZFbrp7xqurLaE53kEkKuAAvjJDAgI8mcZHP1JyplubqjQA
-xvv84gK+OGP3Xk+QK1ZjUQSbjOpjEiSZpRhWcHci3dgOUH4blJfByHw25hlgHowd
-a/2PrNKZVcJ92YienaxxGjcXEUcd0uYEG2+rwllQigFcnMFDhr9B71MfalRHjFKE
-fmdoypqLrri61YBc59P88Rw2/WUpTQjgNubSqa3A2+CKdaRyaRw+2fdF4TdR0h8W
-zbg+lbaPtJHsV+3mJC7fq26MiJDRJa5ZztpMn8su20gbLgi2ShBOaHAYDDi5AQ0E
-UdG9zwEIAMoOBq+QLNozAhxOOl5GL3StTStGRgPRXINfmViTsihrqGCWBBUfXlUE
-OytC0mYcrDUQev/8ToVoyqw+iGSwDkcSXkrEUCKFtHV/GECWtk1keyHgR10YKI1R
-mquSXoubWGqPeG1PAI74XWaRx8UrL8uCXUtmD8Q5J7mDjKR5NpxaXrwlA0bKsf2E
-Gp9tu1kKauuToZhWHMRMqYSOGikQJwWSFYKT1KdNcOXLQF6+bfoJ6sjVYdwfmNQL
-Ixn8QVhoTDedcqClSWB17VDEFDFa7MmqXZz2qtM3X1R/MUMHqPtegQzBGNhRdnI2
-V45+1Nnx/uuCxDbeI4RbHzujnxDiq70AEQEAAYkBHwQYAQIACQUCUdG9zwIbDAAK
-CRBnt+RIaSs4LNVeB/0Y2pZ8I7gAAcEM0Xw8drr4omg2fUoK1J33ozlA/RxeA/lJ
-I3KnyCDTpXuIeBKPGkdL8uMATC9Z8DnBBajRlftNDVZS3Hz4G09G9QpMojvJkFJV
-By+01Flw/X+eeN8NpqSuLV4W+AjEO8at/VvgKr1AFvBRdZ7GkpI1o6DgPe7ZqX+1
-dzQZt3e13W0rVBb/bUgx9iSLoeWP3aq/k+/GRGOR+S6F6BBSl0SQ2EF2+dIywb1x
-JuinEP+AwLAUZ1Bsx9ISC0Agpk2VeHXPL3FGhroEmoMvBzO0kTFGyoeT7PR/BfKv
-+H/g3HsL2LOB9uoIm8/5p2TTU5ttYCXMHhQZ81AY
-=AUp4
------END PGP PUBLIC KEY BLOCK-----
-"""
-
-GIT = 'git'                      # our git command
-MIN_GIT_VERSION = (1, 7, 2)      # minimum supported git version
-repodir = '.repo'                # name of repo's private directory
-S_repo = 'repo'                  # special repo repository
-S_manifests = 'manifests'        # special manifest repository
-REPO_MAIN = S_repo + '/main.py'  # main script
-MIN_PYTHON_VERSION = (2, 6)      # minimum supported python version
-GITC_CONFIG_FILE = '/gitc/.config'
-GITC_FS_ROOT_DIR = '/gitc/manifest-rw/'
-
-
-import errno
-import optparse
-import re
-import shutil
-import stat
-import subprocess
-import sys
-
-if sys.version_info[0] == 3:
-  import urllib.request
-  import urllib.error
-else:
-  import imp
-  import urllib2
-  urllib = imp.new_module('urllib')
-  urllib.request = urllib2
-  urllib.error = urllib2
-
-
-def _print(*objects, **kwargs):
-  sep = kwargs.get('sep', ' ')
-  end = kwargs.get('end', '\n')
-  out = kwargs.get('file', sys.stdout)
-  out.write(sep.join(objects) + end)
-
-
-# Python version check
-ver = sys.version_info
-if (ver[0], ver[1]) < MIN_PYTHON_VERSION:
-  _print('error: Python version %s unsupported.\n'
-         'Please use Python 2.6 - 2.7 instead.'
-         % sys.version.split(' ')[0], file=sys.stderr)
-  sys.exit(1)
-
-home_dot_repo = os.path.expanduser('~/.repoconfig')
-gpg_dir = os.path.join(home_dot_repo, 'gnupg')
-
-extra_args = []
-init_optparse = optparse.OptionParser(usage="repo init -u url [options]")
-
-# Logging
-group = init_optparse.add_option_group('Logging options')
-group.add_option('-q', '--quiet',
-                 dest="quiet", action="store_true", default=False,
-                 help="be quiet")
-
-# Manifest
-group = init_optparse.add_option_group('Manifest options')
-group.add_option('-u', '--manifest-url',
-                 dest='manifest_url',
-                 help='manifest repository location', metavar='URL')
-group.add_option('-b', '--manifest-branch',
-                 dest='manifest_branch',
-                 help='manifest branch or revision', metavar='REVISION')
-group.add_option('-m', '--manifest-name',
-                 dest='manifest_name',
-                 help='initial manifest file', metavar='NAME.xml')
-group.add_option('--mirror',
-                 dest='mirror', action='store_true',
-                 help='create a replica of the remote repositories '
-                      'rather than a client working directory')
-group.add_option('--reference',
-                 dest='reference',
-                 help='location of mirror directory', metavar='DIR')
-group.add_option('--depth', type='int', default=None,
-                 dest='depth',
-                 help='create a shallow clone with given depth; see git clone')
-group.add_option('--archive',
-                 dest='archive', action='store_true',
-                 help='checkout an archive instead of a git repository for '
-                      'each project. See git archive.')
-group.add_option('-g', '--groups',
-                 dest='groups', default='default',
-                 help='restrict manifest projects to ones with specified '
-                      'group(s) [default|all|G1,G2,G3|G4,-G5,-G6]',
-                 metavar='GROUP')
-group.add_option('-p', '--platform',
-                 dest='platform', default="auto",
-                 help='restrict manifest projects to ones with a specified '
-                      'platform group [auto|all|none|linux|darwin|...]',
-                 metavar='PLATFORM')
-group.add_option('--no-clone-bundle',
-                 dest='no_clone_bundle', action='store_true',
-                 help='disable use of /clone.bundle on HTTP/HTTPS')
-
-
-# Tool
-group = init_optparse.add_option_group('repo Version options')
-group.add_option('--repo-url',
-                 dest='repo_url',
-                 help='repo repository location', metavar='URL')
-group.add_option('--repo-branch',
-                 dest='repo_branch',
-                 help='repo branch or revision', metavar='REVISION')
-group.add_option('--no-repo-verify',
-                 dest='no_repo_verify', action='store_true',
-                 help='do not verify repo source code')
-
-# Other
-group = init_optparse.add_option_group('Other options')
-group.add_option('--config-name',
-                 dest='config_name', action="store_true", default=False,
-                 help='Always prompt for name/e-mail')
-
-
-def _GitcInitOptions(init_optparse_arg):
-  init_optparse_arg.set_usage("repo gitc-init -u url -c client [options]")
-  g = init_optparse_arg.add_option_group('GITC options')
-  g.add_option('-f', '--manifest-file',
-               dest='manifest_file',
-               help='Optional manifest file to use for this GITC client.')
-  g.add_option('-c', '--gitc-client',
-               dest='gitc_client',
-               help='The name of the gitc_client instance to create or modify.')
-
-_gitc_manifest_dir = None
-
-
-def get_gitc_manifest_dir():
-  global _gitc_manifest_dir
-  if _gitc_manifest_dir is None:
-    _gitc_manifest_dir = ''
-    try:
-      with open(GITC_CONFIG_FILE, 'r') as gitc_config:
-        for line in gitc_config:
-          match = re.match('gitc_dir=(?P<gitc_manifest_dir>.*)', line)
-          if match:
-            _gitc_manifest_dir = match.group('gitc_manifest_dir')
-    except IOError:
-      pass
-  return _gitc_manifest_dir
-
-
-def gitc_parse_clientdir(gitc_fs_path):
-  """Parse a path in the GITC FS and return its client name.
-
-  @param gitc_fs_path: A subdirectory path within the GITC_FS_ROOT_DIR.
-
-  @returns: The GITC client name
-  """
-  if gitc_fs_path == GITC_FS_ROOT_DIR:
-    return None
-  if not gitc_fs_path.startswith(GITC_FS_ROOT_DIR):
-    manifest_dir = get_gitc_manifest_dir()
-    if manifest_dir == '':
-      return None
-    if manifest_dir[-1] != '/':
-      manifest_dir += '/'
-    if gitc_fs_path == manifest_dir:
-      return None
-    if not gitc_fs_path.startswith(manifest_dir):
-      return None
-    return gitc_fs_path.split(manifest_dir)[1].split('/')[0]
-  return gitc_fs_path.split(GITC_FS_ROOT_DIR)[1].split('/')[0]
-
-
-class CloneFailure(Exception):
-
-  """Indicate the remote clone of repo itself failed.
-  """
-
-
-def _Init(args, gitc_init=False):
-  """Installs repo by cloning it over the network.
-  """
-  if gitc_init:
-    _GitcInitOptions(init_optparse)
-  opt, args = init_optparse.parse_args(args)
-  if args:
-    init_optparse.print_usage()
-    sys.exit(1)
-
-  url = opt.repo_url
-  if not url:
-    url = REPO_URL
-    extra_args.append('--repo-url=%s' % url)
-
-  branch = opt.repo_branch
-  if not branch:
-    branch = REPO_REV
-    extra_args.append('--repo-branch=%s' % branch)
-
-  if branch.startswith('refs/heads/'):
-    branch = branch[len('refs/heads/'):]
-  if branch.startswith('refs/'):
-    _print("fatal: invalid branch name '%s'" % branch, file=sys.stderr)
-    raise CloneFailure()
-
-  try:
-    if gitc_init:
-      gitc_manifest_dir = get_gitc_manifest_dir()
-      if not gitc_manifest_dir:
-        _print('fatal: GITC filesystem is not available. Exiting...',
-               file=sys.stderr)
-        sys.exit(1)
-      gitc_client = opt.gitc_client
-      if not gitc_client:
-        gitc_client = gitc_parse_clientdir(os.getcwd())
-      if not gitc_client:
-        _print('fatal: GITC client (-c) is required.', file=sys.stderr)
-        sys.exit(1)
-      client_dir = os.path.join(gitc_manifest_dir, gitc_client)
-      if not os.path.exists(client_dir):
-        os.makedirs(client_dir)
-      os.chdir(client_dir)
-      if os.path.exists(repodir):
-        # This GITC Client has already initialized repo so continue.
-        return
-
-    os.mkdir(repodir)
-  except OSError as e:
-    if e.errno != errno.EEXIST:
-      _print('fatal: cannot make %s directory: %s'
-             % (repodir, e.strerror), file=sys.stderr)
-      # Don't raise CloneFailure; that would delete the
-      # name. Instead exit immediately.
-      #
-      sys.exit(1)
-
-  _CheckGitVersion()
-  try:
-    if NeedSetupGnuPG():
-      can_verify = SetupGnuPG(opt.quiet)
-    else:
-      can_verify = True
-
-    dst = os.path.abspath(os.path.join(repodir, S_repo))
-    _Clone(url, dst, opt.quiet, not opt.no_clone_bundle)
-
-    if can_verify and not opt.no_repo_verify:
-      rev = _Verify(dst, branch, opt.quiet)
-    else:
-      rev = 'refs/remotes/origin/%s^0' % branch
-
-    _Checkout(dst, branch, rev, opt.quiet)
-  except CloneFailure:
-    if opt.quiet:
-      _print('fatal: repo init failed; run without --quiet to see why',
-             file=sys.stderr)
-    raise
-
-
-def ParseGitVersion(ver_str):
-  if not ver_str.startswith('git version '):
-    return None
-
-  num_ver_str = ver_str[len('git version '):].strip().split('-')[0]
-  to_tuple = []
-  for num_str in num_ver_str.split('.')[:3]:
-    if num_str.isdigit():
-      to_tuple.append(int(num_str))
-    else:
-      to_tuple.append(0)
-  return tuple(to_tuple)
-
-
-def _CheckGitVersion():
-  cmd = [GIT, '--version']
-  try:
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-  except OSError as e:
-    _print(file=sys.stderr)
-    _print("fatal: '%s' is not available" % GIT, file=sys.stderr)
-    _print('fatal: %s' % e, file=sys.stderr)
-    _print(file=sys.stderr)
-    _print('Please make sure %s is installed and in your path.' % GIT,
-           file=sys.stderr)
-    raise CloneFailure()
-
-  ver_str = proc.stdout.read().strip()
-  proc.stdout.close()
-  proc.wait()
-
-  ver_act = ParseGitVersion(ver_str)
-  if ver_act is None:
-    _print('error: "%s" unsupported' % ver_str, file=sys.stderr)
-    raise CloneFailure()
-
-  if ver_act < MIN_GIT_VERSION:
-    need = '.'.join(map(str, MIN_GIT_VERSION))
-    _print('fatal: git %s or later required' % need, file=sys.stderr)
-    raise CloneFailure()
-
-
-def NeedSetupGnuPG():
-  if not os.path.isdir(home_dot_repo):
-    return True
-
-  kv = os.path.join(home_dot_repo, 'keyring-version')
-  if not os.path.exists(kv):
-    return True
-
-  kv = open(kv).read()
-  if not kv:
-    return True
-
-  kv = tuple(map(int, kv.split('.')))
-  if kv < KEYRING_VERSION:
-    return True
-  return False
-
-
-def SetupGnuPG(quiet):
-  try:
-    os.mkdir(home_dot_repo)
-  except OSError as e:
-    if e.errno != errno.EEXIST:
-      _print('fatal: cannot make %s directory: %s'
-             % (home_dot_repo, e.strerror), file=sys.stderr)
-      sys.exit(1)
-
-  try:
-    os.mkdir(gpg_dir, stat.S_IRWXU)
-  except OSError as e:
-    if e.errno != errno.EEXIST:
-      _print('fatal: cannot make %s directory: %s' % (gpg_dir, e.strerror),
-             file=sys.stderr)
-      sys.exit(1)
-
-  env = os.environ.copy()
-  try:
-    env['GNUPGHOME'] = gpg_dir
-  except UnicodeEncodeError:
-    env['GNUPGHOME'] = gpg_dir.encode()
-
-  cmd = ['gpg', '--import']
-  try:
-    proc = subprocess.Popen(cmd,
-                            env=env,
-                            stdin=subprocess.PIPE)
-  except OSError as e:
-    if not quiet:
-      _print('warning: gpg (GnuPG) is not available.', file=sys.stderr)
-      _print('warning: Installing it is strongly encouraged.', file=sys.stderr)
-      _print(file=sys.stderr)
-    return False
-
-  proc.stdin.write(MAINTAINER_KEYS)
-  proc.stdin.close()
-
-  if proc.wait() != 0:
-    _print('fatal: registering repo maintainer keys failed', file=sys.stderr)
-    sys.exit(1)
-  _print()
-
-  fd = open(os.path.join(home_dot_repo, 'keyring-version'), 'w')
-  fd.write('.'.join(map(str, KEYRING_VERSION)) + '\n')
-  fd.close()
-  return True
-
-
-def _SetConfig(local, name, value):
-  """Set a git configuration option to the specified value.
-  """
-  cmd = [GIT, 'config', name, value]
-  if subprocess.Popen(cmd, cwd=local).wait() != 0:
-    raise CloneFailure()
-
-
-def _InitHttp():
-  handlers = []
-
-  mgr = urllib.request.HTTPPasswordMgrWithDefaultRealm()
-  try:
-    import netrc
-    n = netrc.netrc()
-    for host in n.hosts:
-      p = n.hosts[host]
-      mgr.add_password(p[1], 'http://%s/' % host, p[0], p[2])
-      mgr.add_password(p[1], 'https://%s/' % host, p[0], p[2])
-  except:  # pylint: disable=bare-except
-    pass
-  handlers.append(urllib.request.HTTPBasicAuthHandler(mgr))
-  handlers.append(urllib.request.HTTPDigestAuthHandler(mgr))
-
-  if 'http_proxy' in os.environ:
-    url = os.environ['http_proxy']
-    handlers.append(urllib.request.ProxyHandler({'http': url, 'https': url}))
-  if 'REPO_CURL_VERBOSE' in os.environ:
-    handlers.append(urllib.request.HTTPHandler(debuglevel=1))
-    handlers.append(urllib.request.HTTPSHandler(debuglevel=1))
-  urllib.request.install_opener(urllib.request.build_opener(*handlers))
-
-
-def _Fetch(url, local, src, quiet):
-  if not quiet:
-    _print('Get %s' % url, file=sys.stderr)
-
-  cmd = [GIT, 'fetch']
-  if quiet:
-    cmd.append('--quiet')
-    err = subprocess.PIPE
-  else:
-    err = None
-  cmd.append(src)
-  cmd.append('+refs/heads/*:refs/remotes/origin/*')
-  cmd.append('refs/tags/*:refs/tags/*')
-
-  proc = subprocess.Popen(cmd, cwd=local, stderr=err)
-  if err:
-    proc.stderr.read()
-    proc.stderr.close()
-  if proc.wait() != 0:
-    raise CloneFailure()
-
-
-def _DownloadBundle(url, local, quiet):
-  if not url.endswith('/'):
-    url += '/'
-  url += 'clone.bundle'
-
-  proc = subprocess.Popen(
-      [GIT, 'config', '--get-regexp', 'url.*.insteadof'],
-      cwd=local,
-      stdout=subprocess.PIPE)
-  for line in proc.stdout:
-    m = re.compile(r'^url\.(.*)\.insteadof (.*)$').match(line)
-    if m:
-      new_url = m.group(1)
-      old_url = m.group(2)
-      if url.startswith(old_url):
-        url = new_url + url[len(old_url):]
-        break
-  proc.stdout.close()
-  proc.wait()
-
-  if not url.startswith('http:') and not url.startswith('https:'):
-    return False
-
-  dest = open(os.path.join(local, '.git', 'clone.bundle'), 'w+b')
-  try:
-    try:
-      r = urllib.request.urlopen(url)
-    except urllib.error.HTTPError as e:
-      if e.code in [401, 403, 404, 501]:
-        return False
-      _print('fatal: Cannot get %s' % url, file=sys.stderr)
-      _print('fatal: HTTP error %s' % e.code, file=sys.stderr)
-      raise CloneFailure()
-    except urllib.error.URLError as e:
-      _print('fatal: Cannot get %s' % url, file=sys.stderr)
-      _print('fatal: error %s' % e.reason, file=sys.stderr)
-      raise CloneFailure()
-    try:
-      if not quiet:
-        _print('Get %s' % url, file=sys.stderr)
-      while True:
-        buf = r.read(8192)
-        if buf == '':
-          return True
-        dest.write(buf)
-    finally:
-      r.close()
-  finally:
-    dest.close()
-
-
-def _ImportBundle(local):
-  path = os.path.join(local, '.git', 'clone.bundle')
-  try:
-    _Fetch(local, local, path, True)
-  finally:
-    os.remove(path)
-
-
-def _Clone(url, local, quiet, clone_bundle):
-  """Clones a git repository to a new subdirectory of repodir
-  """
-  try:
-    os.mkdir(local)
-  except OSError as e:
-    _print('fatal: cannot make %s directory: %s' % (local, e.strerror),
-           file=sys.stderr)
-    raise CloneFailure()
-
-  cmd = [GIT, 'init', '--quiet']
-  try:
-    proc = subprocess.Popen(cmd, cwd=local)
-  except OSError as e:
-    _print(file=sys.stderr)
-    _print("fatal: '%s' is not available" % GIT, file=sys.stderr)
-    _print('fatal: %s' % e, file=sys.stderr)
-    _print(file=sys.stderr)
-    _print('Please make sure %s is installed and in your path.' % GIT,
-           file=sys.stderr)
-    raise CloneFailure()
-  if proc.wait() != 0:
-    _print('fatal: could not create %s' % local, file=sys.stderr)
-    raise CloneFailure()
-
-  _InitHttp()
-  _SetConfig(local, 'remote.origin.url', url)
-  _SetConfig(local,
-             'remote.origin.fetch',
-             '+refs/heads/*:refs/remotes/origin/*')
-  if clone_bundle and _DownloadBundle(url, local, quiet):
-    _ImportBundle(local)
-  _Fetch(url, local, 'origin', quiet)
-
-
-def _Verify(cwd, branch, quiet):
-  """Verify the branch has been signed by a tag.
-  """
-  cmd = [GIT, 'describe', 'origin/%s' % branch]
-  proc = subprocess.Popen(cmd,
-                          stdout=subprocess.PIPE,
-                          stderr=subprocess.PIPE,
-                          cwd=cwd)
-  cur = proc.stdout.read().strip()
-  proc.stdout.close()
-
-  proc.stderr.read()
-  proc.stderr.close()
-
-  if proc.wait() != 0 or not cur:
-    _print(file=sys.stderr)
-    _print("fatal: branch '%s' has not been signed" % branch, file=sys.stderr)
-    raise CloneFailure()
-
-  m = re.compile(r'^(.*)-[0-9]{1,}-g[0-9a-f]{1,}$').match(cur)
-  if m:
-    cur = m.group(1)
-    if not quiet:
-      _print(file=sys.stderr)
-      _print("info: Ignoring branch '%s'; using tagged release '%s'"
-             % (branch, cur), file=sys.stderr)
-      _print(file=sys.stderr)
-
-  env = os.environ.copy()
-  try:
-    env['GNUPGHOME'] = gpg_dir
-  except UnicodeEncodeError:
-    env['GNUPGHOME'] = gpg_dir.encode()
-
-  cmd = [GIT, 'tag', '-v', cur]
-  proc = subprocess.Popen(cmd,
-                          stdout=subprocess.PIPE,
-                          stderr=subprocess.PIPE,
-                          cwd=cwd,
-                          env=env)
-  out = proc.stdout.read()
-  proc.stdout.close()
-
-  err = proc.stderr.read()
-  proc.stderr.close()
-
-  if proc.wait() != 0:
-    _print(file=sys.stderr)
-    _print(out, file=sys.stderr)
-    _print(err, file=sys.stderr)
-    _print(file=sys.stderr)
-    raise CloneFailure()
-  return '%s^0' % cur
-
-
-def _Checkout(cwd, branch, rev, quiet):
-  """Checkout an upstream branch into the repository and track it.
-  """
-  cmd = [GIT, 'update-ref', 'refs/heads/default', rev]
-  if subprocess.Popen(cmd, cwd=cwd).wait() != 0:
-    raise CloneFailure()
-
-  _SetConfig(cwd, 'branch.default.remote', 'origin')
-  _SetConfig(cwd, 'branch.default.merge', 'refs/heads/%s' % branch)
-
-  cmd = [GIT, 'symbolic-ref', 'HEAD', 'refs/heads/default']
-  if subprocess.Popen(cmd, cwd=cwd).wait() != 0:
-    raise CloneFailure()
-
-  cmd = [GIT, 'read-tree', '--reset', '-u']
-  if not quiet:
-    cmd.append('-v')
-  cmd.append('HEAD')
-  if subprocess.Popen(cmd, cwd=cwd).wait() != 0:
-    raise CloneFailure()
-
-
-def _FindRepo():
-  """Look for a repo installation, starting at the current directory.
-  """
-  curdir = os.getcwd()
-  repo = None
-
-  olddir = None
-  while curdir != '/' \
-          and curdir != olddir \
-          and not repo:
-    repo = os.path.join(curdir, repodir, REPO_MAIN)
-    if not os.path.isfile(repo):
-      repo = None
-      olddir = curdir
-      curdir = os.path.dirname(curdir)
-  return (repo, os.path.join(curdir, repodir))
-
-
-class _Options(object):
-  help = False
-
-
-def _ParseArguments(args):
-  cmd = None
-  opt = _Options()
-  arg = []
-
-  for i in range(len(args)):
-    a = args[i]
-    if a == '-h' or a == '--help':
-      opt.help = True
-
-    elif not a.startswith('-'):
-      cmd = a
-      arg = args[i + 1:]
-      break
-  return cmd, opt, arg
-
-
-def _Usage():
-  gitc_usage = ""
-  if get_gitc_manifest_dir():
-    gitc_usage = "  gitc-init Initialize a GITC Client.\n"
-
-  _print(
-      """usage: repo COMMAND [ARGS]
-
-repo is not yet installed.  Use "repo init" to install it here.
-
-The most commonly used repo commands are:
-
-  init      Install repo in the current working directory
-""" + gitc_usage +
-      """  help      Display detailed help on a command
-
-For access to the full online help, install repo ("repo init").
-""", file=sys.stderr)
-  sys.exit(1)
-
-
-def _Help(args):
-  if args:
-    if args[0] == 'init':
-      init_optparse.print_help()
-      sys.exit(0)
-    elif args[0] == 'gitc-init':
-      _GitcInitOptions(init_optparse)
-      init_optparse.print_help()
-      sys.exit(0)
-    else:
-      _print("error: '%s' is not a bootstrap command.\n"
-             '        For access to online help, install repo ("repo init").'
-             % args[0], file=sys.stderr)
-  else:
-    _Usage()
-  sys.exit(1)
-
-
-def _NotInstalled():
-  _print('error: repo is not installed.  Use "repo init" to install it here.',
-         file=sys.stderr)
-  sys.exit(1)
-
-
-def _NoCommands(cmd):
-  _print("""error: command '%s' requires repo to be installed first.
-         Use "repo init" to install it here.""" % cmd, file=sys.stderr)
-  sys.exit(1)
-
-
-def _RunSelf(wrapper_path):
-  my_dir = os.path.dirname(wrapper_path)
-  my_main = os.path.join(my_dir, 'main.py')
-  my_git = os.path.join(my_dir, '.git')
-
-  if os.path.isfile(my_main) and os.path.isdir(my_git):
-    for name in ['git_config.py',
-                 'project.py',
-                 'subcmds']:
-      if not os.path.exists(os.path.join(my_dir, name)):
-        return None, None
-    return my_main, my_git
-  return None, None
-
-
-def _SetDefaultsTo(gitdir):
-  global REPO_URL
-  global REPO_REV
-
-  REPO_URL = gitdir
-  proc = subprocess.Popen([GIT,
-                           '--git-dir=%s' % gitdir,
-                           'symbolic-ref',
-                           'HEAD'],
-                          stdout=subprocess.PIPE,
-                          stderr=subprocess.PIPE)
-  REPO_REV = proc.stdout.read().strip()
-  proc.stdout.close()
-
-  proc.stderr.read()
-  proc.stderr.close()
-
-  if proc.wait() != 0:
-    _print('fatal: %s has no current branch' % gitdir, file=sys.stderr)
-    sys.exit(1)
-
-
-def main(orig_args):
-  cmd, opt, args = _ParseArguments(orig_args)
-
-  repo_main, rel_repo_dir = None, None
-  # Don't use the local repo copy, make sure to switch to the gitc client first.
-  if cmd != 'gitc-init':
-    repo_main, rel_repo_dir = _FindRepo()
-
-  wrapper_path = os.path.abspath(__file__)
-  my_main, my_git = _RunSelf(wrapper_path)
-
-  cwd = os.getcwd()
-  if get_gitc_manifest_dir() and cwd.startswith(get_gitc_manifest_dir()):
-    _print('error: repo cannot be used in the GITC local manifest directory.'
-           '\nIf you want to work on this GITC client please rerun this '
-           'command from the corresponding client under /gitc/',
-           file=sys.stderr)
-    sys.exit(1)
-  if not repo_main:
-    if opt.help:
-      _Usage()
-    if cmd == 'help':
-      _Help(args)
-    if not cmd:
-      _NotInstalled()
-    if cmd == 'init' or cmd == 'gitc-init':
-      if my_git:
-        _SetDefaultsTo(my_git)
-      try:
-        _Init(args, gitc_init=(cmd == 'gitc-init'))
-      except CloneFailure:
-        shutil.rmtree(os.path.join(repodir, S_repo), ignore_errors=True)
-        sys.exit(1)
-      repo_main, rel_repo_dir = _FindRepo()
-    else:
-      _NoCommands(cmd)
-
-  if my_main:
-    repo_main = my_main
-
-  ver_str = '.'.join(map(str, VERSION))
-  me = [sys.executable, repo_main,
-        '--repo-dir=%s' % rel_repo_dir,
-        '--wrapper-version=%s' % ver_str,
-        '--wrapper-path=%s' % wrapper_path,
-        '--']
-  me.extend(orig_args)
-  me.extend(extra_args)
-  try:
-    os.execv(sys.executable, me)
-  except OSError as e:
-    _print("fatal: unable to start %s" % repo_main, file=sys.stderr)
-    _print("fatal: %s" % e, file=sys.stderr)
-    sys.exit(148)
-
-
-if __name__ == '__main__':
-  if ver[0] == 3:
-    _print('warning: Python 3 support is currently experimental. YMMV.\n'
-           'Please use Python 2.6 - 2.7 instead.',
-           file=sys.stderr)
-  main(sys.argv[1:])
+  1 #!/usr/bin/env python
+  2 
+  3 # repo default configuration
+  4 #
+  5 import os
+  6 REPO_URL = os.environ.get('REPO_URL', None)
+  7 if not REPO_URL:
+  8   REPO_URL = 'https://gerrit.googlesource.com/git-repo'
+  9 REPO_REV = 'stable'
+ 10 
+ 11 # Copyright (C) 2008 Google Inc.
+ 12 #
+ 13 # Licensed under the Apache License, Version 2.0 (the "License");
+ 14 # you may not use this file except in compliance with the License.
+ 15 # You may obtain a copy of the License at
+ 16 #
+ 17 #      http://www.apache.org/licenses/LICENSE-2.0
+ 18 #
+ 19 # Unless required by applicable law or agreed to in writing, software
+ 20 # distributed under the License is distributed on an "AS IS" BASIS,
+ 21 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ 22 # See the License for the specific language governing permissions and
+ 23 # limitations under the License.
+ 24 
+ 25 # increment this whenever we make important changes to this script
+ 26 VERSION = (1, 23)
+ 27 
+ 28 # increment this if the MAINTAINER_KEYS block is modified
+ 29 KEYRING_VERSION = (1, 2)
+ 30 
+ 31 # Each individual key entry is created by using:
+ 32 # gpg --armor --export keyid
+ 33 MAINTAINER_KEYS = """
+ 34 
+ 35      Repo Maintainer <repo@android.kernel.org>
+ 36 -----BEGIN PGP PUBLIC KEY BLOCK-----
+ 37 Version: GnuPG v1.4.2.2 (GNU/Linux)
+ 38 
+ 39 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
+ 74 =CMiZ
+ 75 -----END PGP PUBLIC KEY BLOCK-----
+ 76 
+ 77      Conley Owens <cco3@android.com>
+ 78 -----BEGIN PGP PUBLIC KEY BLOCK-----
+ 79 Version: GnuPG v1.4.11 (GNU/Linux)
+ 80 
+ 81 mQENBFHRvc8BCADFg45Xx/y6QDC+T7Y/gGc7vx0ww7qfOwIKlAZ9xG3qKunMxo+S
+ 82 hPCnzEl3cq+6I1Ww/ndop/HB3N3toPXRCoN8Vs4/Hc7by+SnaLFnacrm+tV5/OgT
+ 83 V37Lzt8lhay1Kl+YfpFwHYYpIEBLFV9knyfRXS/428W2qhdzYfvB15/AasRmwmor
+ 84 py4NIzSs8UD/SPr1ihqNCdZM76+MQyN5HMYXW/ALZXUFG0pwluHFA7hrfPG74i8C
+ 85 zMiP7qvMWIl/r/jtzHioH1dRKgbod+LZsrDJ8mBaqsZaDmNJMhss9g76XvfMyLra
+ 86 9DI9/iFuBpGzeqBv0hwOGQspLRrEoyTeR6n1ABEBAAG0H0NvbmxleSBPd2VucyA8
+ 87 Y2NvM0BhbmRyb2lkLmNvbT6JATgEEwECACIFAlHRvc8CGwMGCwkIBwMCBhUIAgkK
+ 88 CwQWAgMBAh4BAheAAAoJEGe35EhpKzgsP6AIAJKJmNtn4l7hkYHKHFSo3egb6RjQ
+ 89 zEIP3MFTcu8HFX1kF1ZFbrp7xqurLaE53kEkKuAAvjJDAgI8mcZHP1JyplubqjQA
+ 90 xvv84gK+OGP3Xk+QK1ZjUQSbjOpjEiSZpRhWcHci3dgOUH4blJfByHw25hlgHowd
+ 91 a/2PrNKZVcJ92YienaxxGjcXEUcd0uYEG2+rwllQigFcnMFDhr9B71MfalRHjFKE
+ 92 fmdoypqLrri61YBc59P88Rw2/WUpTQjgNubSqa3A2+CKdaRyaRw+2fdF4TdR0h8W
+ 93 zbg+lbaPtJHsV+3mJC7fq26MiJDRJa5ZztpMn8su20gbLgi2ShBOaHAYDDi5AQ0E
+ 94 UdG9zwEIAMoOBq+QLNozAhxOOl5GL3StTStGRgPRXINfmViTsihrqGCWBBUfXlUE
+ 95 OytC0mYcrDUQev/8ToVoyqw+iGSwDkcSXkrEUCKFtHV/GECWtk1keyHgR10YKI1R
+ 96 mquSXoubWGqPeG1PAI74XWaRx8UrL8uCXUtmD8Q5J7mDjKR5NpxaXrwlA0bKsf2E
+ 97 Gp9tu1kKauuToZhWHMRMqYSOGikQJwWSFYKT1KdNcOXLQF6+bfoJ6sjVYdwfmNQL
+ 98 Ixn8QVhoTDedcqClSWB17VDEFDFa7MmqXZz2qtM3X1R/MUMHqPtegQzBGNhRdnI2
+ 99 V45+1Nnx/uuCxDbeI4RbHzujnxDiq70AEQEAAYkBHwQYAQIACQUCUdG9zwIbDAAK
+100 CRBnt+RIaSs4LNVeB/0Y2pZ8I7gAAcEM0Xw8drr4omg2fUoK1J33ozlA/RxeA/lJ
+101 I3KnyCDTpXuIeBKPGkdL8uMATC9Z8DnBBajRlftNDVZS3Hz4G09G9QpMojvJkFJV
+102 By+01Flw/X+eeN8NpqSuLV4W+AjEO8at/VvgKr1AFvBRdZ7GkpI1o6DgPe7ZqX+1
+103 dzQZt3e13W0rVBb/bUgx9iSLoeWP3aq/k+/GRGOR+S6F6BBSl0SQ2EF2+dIywb1x
+104 JuinEP+AwLAUZ1Bsx9ISC0Agpk2VeHXPL3FGhroEmoMvBzO0kTFGyoeT7PR/BfKv
+105 +H/g3HsL2LOB9uoIm8/5p2TTU5ttYCXMHhQZ81AY
+106 =AUp4
+107 -----END PGP PUBLIC KEY BLOCK-----
+108 """
+109 
+110 GIT = 'git'                      # our git command
+111 MIN_GIT_VERSION = (1, 7, 2)      # minimum supported git version
+112 repodir = '.repo'                # name of repo's private directory
+113 S_repo = 'repo'                  # special repo repository
+114 S_manifests = 'manifests'        # special manifest repository
+115 REPO_MAIN = S_repo + '/main.py'  # main script
+116 MIN_PYTHON_VERSION = (2, 6)      # minimum supported python version
+117 GITC_CONFIG_FILE = '/gitc/.config'
+118 GITC_FS_ROOT_DIR = '/gitc/manifest-rw/'
+119 
+120 
+121 import errno
+122 import optparse
+123 import re
+124 import shutil
+125 import stat
+126 import subprocess
+127 import sys
+128 
+129 if sys.version_info[0] == 3:
+130   import urllib.request
+131   import urllib.error
+132 else:
+133   import imp
+134   import urllib2
+135   urllib = imp.new_module('urllib')
+136   urllib.request = urllib2
+137   urllib.error = urllib2
+138 
+139 
+140 def _print(*objects, **kwargs):
+141   sep = kwargs.get('sep', ' ')
+142   end = kwargs.get('end', '\n')
+143   out = kwargs.get('file', sys.stdout)
+144   out.write(sep.join(objects) + end)
+145 
+146 
+147 # Python version check
+148 ver = sys.version_info
+149 if (ver[0], ver[1]) < MIN_PYTHON_VERSION:
+150   _print('error: Python version %s unsupported.\n'
+151          'Please use Python 2.6 - 2.7 instead.'
+152          % sys.version.split(' ')[0], file=sys.stderr)
+153   sys.exit(1)
+154 
+155 home_dot_repo = os.path.expanduser('~/.repoconfig')
+156 gpg_dir = os.path.join(home_dot_repo, 'gnupg')
+157 
+158 extra_args = []
+159 init_optparse = optparse.OptionParser(usage="repo init -u url [options]")
+160 
+161 # Logging
+162 group = init_optparse.add_option_group('Logging options')
+163 group.add_option('-q', '--quiet',
+164                  dest="quiet", action="store_true", default=False,
+165                  help="be quiet")
+166 
+167 # Manifest
+168 group = init_optparse.add_option_group('Manifest options')
+169 group.add_option('-u', '--manifest-url',
+170                  dest='manifest_url',
+171                  help='manifest repository location', metavar='URL')
+172 group.add_option('-b', '--manifest-branch',
+173                  dest='manifest_branch',
+174                  help='manifest branch or revision', metavar='REVISION')
+175 group.add_option('-m', '--manifest-name',
+176                  dest='manifest_name',
+177                  help='initial manifest file', metavar='NAME.xml')
+178 group.add_option('--mirror',
+179                  dest='mirror', action='store_true',
+180                  help='create a replica of the remote repositories '
+181                       'rather than a client working directory')
+182 group.add_option('--reference',
+183                  dest='reference',
+184                  help='location of mirror directory', metavar='DIR')
+185 group.add_option('--depth', type='int', default=None,
+186                  dest='depth',
+187                  help='create a shallow clone with given depth; see git clone')
+188 group.add_option('--archive',
+189                  dest='archive', action='store_true',
+190                  help='checkout an archive instead of a git repository for '
+191                       'each project. See git archive.')
+192 group.add_option('-g', '--groups',
+193                  dest='groups', default='default',
+194                  help='restrict manifest projects to ones with specified '
+195                       'group(s) [default|all|G1,G2,G3|G4,-G5,-G6]',
+196                  metavar='GROUP')
+197 group.add_option('-p', '--platform',
+198                  dest='platform', default="auto",
+199                  help='restrict manifest projects to ones with a specified '
+200                       'platform group [auto|all|none|linux|darwin|...]',
+201                  metavar='PLATFORM')
+202 group.add_option('--no-clone-bundle',
+203                  dest='no_clone_bundle', action='store_true',
+204                  help='disable use of /clone.bundle on HTTP/HTTPS')
+205 
+206 
+207 # Tool
+208 group = init_optparse.add_option_group('repo Version options')
+209 group.add_option('--repo-url',
+210                  dest='repo_url',
+211                  help='repo repository location', metavar='URL')
+212 group.add_option('--repo-branch',
+213                  dest='repo_branch',
+214                  help='repo branch or revision', metavar='REVISION')
+215 group.add_option('--no-repo-verify',
+216                  dest='no_repo_verify', action='store_true',
+217                  help='do not verify repo source code')
+218 
+219 # Other
+220 group = init_optparse.add_option_group('Other options')
+221 group.add_option('--config-name',
+222                  dest='config_name', action="store_true", default=False,
+223                  help='Always prompt for name/e-mail')
+224 
+225 
+226 def _GitcInitOptions(init_optparse_arg):
+227   init_optparse_arg.set_usage("repo gitc-init -u url -c client [options]")
+228   g = init_optparse_arg.add_option_group('GITC options')
+229   g.add_option('-f', '--manifest-file',
+230                dest='manifest_file',
+231                help='Optional manifest file to use for this GITC client.')
+232   g.add_option('-c', '--gitc-client',
+233                dest='gitc_client',
+234                help='The name of the gitc_client instance to create or modify.')
+235 
+236 _gitc_manifest_dir = None
+237 
+238 
+239 def get_gitc_manifest_dir():
+240   global _gitc_manifest_dir
+241   if _gitc_manifest_dir is None:
+242     _gitc_manifest_dir = ''
+243     try:
+244       with open(GITC_CONFIG_FILE, 'r') as gitc_config:
+245         for line in gitc_config:
+246           match = re.match('gitc_dir=(?P<gitc_manifest_dir>.*)', line)
+247           if match:
+248             _gitc_manifest_dir = match.group('gitc_manifest_dir')
+249     except IOError:
+250       pass
+251   return _gitc_manifest_dir
+252 
+253 
+254 def gitc_parse_clientdir(gitc_fs_path):
+255   """Parse a path in the GITC FS and return its client name.
+256 
+257   @param gitc_fs_path: A subdirectory path within the GITC_FS_ROOT_DIR.
+258 
+259   @returns: The GITC client name
+260   """
+261   if gitc_fs_path == GITC_FS_ROOT_DIR:
+262     return None
+263   if not gitc_fs_path.startswith(GITC_FS_ROOT_DIR):
+264     manifest_dir = get_gitc_manifest_dir()
+265     if manifest_dir == '':
+266       return None
+267     if manifest_dir[-1] != '/':
+268       manifest_dir += '/'
+269     if gitc_fs_path == manifest_dir:
+270       return None
+271     if not gitc_fs_path.startswith(manifest_dir):
+272       return None
+273     return gitc_fs_path.split(manifest_dir)[1].split('/')[0]
+274   return gitc_fs_path.split(GITC_FS_ROOT_DIR)[1].split('/')[0]
+275 
+276 
+277 class CloneFailure(Exception):
+278 
+279   """Indicate the remote clone of repo itself failed.
+280   """
+281 
+282 
+283 def _Init(args, gitc_init=False):
+284   """Installs repo by cloning it over the network.
+285   """
+286   if gitc_init:
+287     _GitcInitOptions(init_optparse)
+288   opt, args = init_optparse.parse_args(args)
+289   if args:
+290     init_optparse.print_usage()
+291     sys.exit(1)
+292 
+293   url = opt.repo_url
+294   if not url:
+295     url = REPO_URL
+296     extra_args.append('--repo-url=%s' % url)
+297 
+298   branch = opt.repo_branch
+299   if not branch:
+300     branch = REPO_REV
+301     extra_args.append('--repo-branch=%s' % branch)
+302 
+303   if branch.startswith('refs/heads/'):
+304     branch = branch[len('refs/heads/'):]
+305   if branch.startswith('refs/'):
+306     _print("fatal: invalid branch name '%s'" % branch, file=sys.stderr)
+307     raise CloneFailure()
+308 
+309   try:
+310     if gitc_init:
+311       gitc_manifest_dir = get_gitc_manifest_dir()
+312       if not gitc_manifest_dir:
+313         _print('fatal: GITC filesystem is not available. Exiting...',
+314                file=sys.stderr)
+315         sys.exit(1)
+316       gitc_client = opt.gitc_client
+317       if not gitc_client:
+318         gitc_client = gitc_parse_clientdir(os.getcwd())
+319       if not gitc_client:
+320         _print('fatal: GITC client (-c) is required.', file=sys.stderr)
+321         sys.exit(1)
+322       client_dir = os.path.join(gitc_manifest_dir, gitc_client)
+323       if not os.path.exists(client_dir):
+324         os.makedirs(client_dir)
+325       os.chdir(client_dir)
+326       if os.path.exists(repodir):
+327         # This GITC Client has already initialized repo so continue.
+328         return
+329 
+330     os.mkdir(repodir)
+331   except OSError as e:
+332     if e.errno != errno.EEXIST:
+333       _print('fatal: cannot make %s directory: %s'
+334              % (repodir, e.strerror), file=sys.stderr)
+335       # Don't raise CloneFailure; that would delete the
+336       # name. Instead exit immediately.
+337       #
+338       sys.exit(1)
+339 
+340   _CheckGitVersion()
+341   try:
+342     if NeedSetupGnuPG():
+343       can_verify = SetupGnuPG(opt.quiet)
+344     else:
+345       can_verify = True
+346 
+347     dst = os.path.abspath(os.path.join(repodir, S_repo))
+348     _Clone(url, dst, opt.quiet, not opt.no_clone_bundle)
+349 
+350     if can_verify and not opt.no_repo_verify:
+351       rev = _Verify(dst, branch, opt.quiet)
+352     else:
+353       rev = 'refs/remotes/origin/%s^0' % branch
+354 
+355     _Checkout(dst, branch, rev, opt.quiet)
+356   except CloneFailure:
+357     if opt.quiet:
+358       _print('fatal: repo init failed; run without --quiet to see why',
+359              file=sys.stderr)
+360     raise
+361 
+362 
+363 def ParseGitVersion(ver_str):
+364   if not ver_str.startswith('git version '):
+365     return None
+366 
+367   num_ver_str = ver_str[len('git version '):].strip().split('-')[0]
+368   to_tuple = []
+369   for num_str in num_ver_str.split('.')[:3]:
+370     if num_str.isdigit():
+371       to_tuple.append(int(num_str))
+372     else:
+373       to_tuple.append(0)
+374   return tuple(to_tuple)
+375 
+376 
+377 def _CheckGitVersion():
+378   cmd = [GIT, '--version']
+379   try:
+380     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+381   except OSError as e:
+382     _print(file=sys.stderr)
+383     _print("fatal: '%s' is not available" % GIT, file=sys.stderr)
+384     _print('fatal: %s' % e, file=sys.stderr)
+385     _print(file=sys.stderr)
+386     _print('Please make sure %s is installed and in your path.' % GIT,
+387            file=sys.stderr)
+388     raise CloneFailure()
+389 
+390   ver_str = proc.stdout.read().strip()
+391   proc.stdout.close()
+392   proc.wait()
+393 
+394   ver_act = ParseGitVersion(ver_str)
+395   if ver_act is None:
+396     _print('error: "%s" unsupported' % ver_str, file=sys.stderr)
+397     raise CloneFailure()
+398 
+399   if ver_act < MIN_GIT_VERSION:
+400     need = '.'.join(map(str, MIN_GIT_VERSION))
+401     _print('fatal: git %s or later required' % need, file=sys.stderr)
+402     raise CloneFailure()
+403 
+404 
+405 def NeedSetupGnuPG():
+406   if not os.path.isdir(home_dot_repo):
+407     return True
+408 
+409   kv = os.path.join(home_dot_repo, 'keyring-version')
+410   if not os.path.exists(kv):
+411     return True
+412 
+413   kv = open(kv).read()
+414   if not kv:
+415     return True
+416 
+417   kv = tuple(map(int, kv.split('.')))
+418   if kv < KEYRING_VERSION:
+419     return True
+420   return False
+421 
+422 
+423 def SetupGnuPG(quiet):
+424   try:
+425     os.mkdir(home_dot_repo)
+426   except OSError as e:
+427     if e.errno != errno.EEXIST:
+428       _print('fatal: cannot make %s directory: %s'
+429              % (home_dot_repo, e.strerror), file=sys.stderr)
+430       sys.exit(1)
+431 
+432   try:
+433     os.mkdir(gpg_dir, stat.S_IRWXU)
+434   except OSError as e:
+435     if e.errno != errno.EEXIST:
+436       _print('fatal: cannot make %s directory: %s' % (gpg_dir, e.strerror),
+437              file=sys.stderr)
+438       sys.exit(1)
+439 
+440   env = os.environ.copy()
+441   try:
+442     env['GNUPGHOME'] = gpg_dir
+443   except UnicodeEncodeError:
+444     env['GNUPGHOME'] = gpg_dir.encode()
+445 
+446   cmd = ['gpg', '--import']
+447   try:
+448     proc = subprocess.Popen(cmd,
+449                             env=env,
+450                             stdin=subprocess.PIPE)
+451   except OSError as e:
+452     if not quiet:
+453       _print('warning: gpg (GnuPG) is not available.', file=sys.stderr)
+454       _print('warning: Installing it is strongly encouraged.', file=sys.stderr)
+455       _print(file=sys.stderr)
+456     return False
+457 
+458   proc.stdin.write(MAINTAINER_KEYS)
+459   proc.stdin.close()
+460 
+461   if proc.wait() != 0:
+462     _print('fatal: registering repo maintainer keys failed', file=sys.stderr)
+463     sys.exit(1)
+464   _print()
+465 
+466   fd = open(os.path.join(home_dot_repo, 'keyring-version'), 'w')
+467   fd.write('.'.join(map(str, KEYRING_VERSION)) + '\n')
+468   fd.close()
+469   return True
+470 
+471 
+472 def _SetConfig(local, name, value):
+473   """Set a git configuration option to the specified value.
+474   """
+475   cmd = [GIT, 'config', name, value]
+476   if subprocess.Popen(cmd, cwd=local).wait() != 0:
+477     raise CloneFailure()
+478 
+479 
+480 def _InitHttp():
+481   handlers = []
+482 
+483   mgr = urllib.request.HTTPPasswordMgrWithDefaultRealm()
+484   try:
+485     import netrc
+486     n = netrc.netrc()
+487     for host in n.hosts:
+488       p = n.hosts[host]
+489       mgr.add_password(p[1], 'http://%s/' % host, p[0], p[2])
+490       mgr.add_password(p[1], 'https://%s/' % host, p[0], p[2])
+491   except:  # pylint: disable=bare-except
+492     pass
+493   handlers.append(urllib.request.HTTPBasicAuthHandler(mgr))
+494   handlers.append(urllib.request.HTTPDigestAuthHandler(mgr))
+495 
+496   if 'http_proxy' in os.environ:
+497     url = os.environ['http_proxy']
+498     handlers.append(urllib.request.ProxyHandler({'http': url, 'https': url}))
+499   if 'REPO_CURL_VERBOSE' in os.environ:
+500     handlers.append(urllib.request.HTTPHandler(debuglevel=1))
+501     handlers.append(urllib.request.HTTPSHandler(debuglevel=1))
+502   urllib.request.install_opener(urllib.request.build_opener(*handlers))
+503 
+504 
+505 def _Fetch(url, local, src, quiet):
+506   if not quiet:
+507     _print('Get %s' % url, file=sys.stderr)
+508 
+509   cmd = [GIT, 'fetch']
+510   if quiet:
+511     cmd.append('--quiet')
+512     err = subprocess.PIPE
+513   else:
+514     err = None
+515   cmd.append(src)
+516   cmd.append('+refs/heads/*:refs/remotes/origin/*')
+517   cmd.append('refs/tags/*:refs/tags/*')
+518 
+519   proc = subprocess.Popen(cmd, cwd=local, stderr=err)
+520   if err:
+521     proc.stderr.read()
+522     proc.stderr.close()
+523   if proc.wait() != 0:
+524     raise CloneFailure()
+525 
+526 
+527 def _DownloadBundle(url, local, quiet):
+528   if not url.endswith('/'):
+529     url += '/'
+530   url += 'clone.bundle'
+531 
+532   proc = subprocess.Popen(
+533       [GIT, 'config', '--get-regexp', 'url.*.insteadof'],
+534       cwd=local,
+535       stdout=subprocess.PIPE)
+536   for line in proc.stdout:
+537     m = re.compile(r'^url\.(.*)\.insteadof (.*)$').match(line)
+538     if m:
+539       new_url = m.group(1)
+540       old_url = m.group(2)
+541       if url.startswith(old_url):
+542         url = new_url + url[len(old_url):]
+543         break
+544   proc.stdout.close()
+545   proc.wait()
+546 
+547   if not url.startswith('http:') and not url.startswith('https:'):
+548     return False
+549 
+550   dest = open(os.path.join(local, '.git', 'clone.bundle'), 'w+b')
+551   try:
+552     try:
+553       r = urllib.request.urlopen(url)
+554     except urllib.error.HTTPError as e:
+555       if e.code in [401, 403, 404, 501]:
+556         return False
+557       _print('fatal: Cannot get %s' % url, file=sys.stderr)
+558       _print('fatal: HTTP error %s' % e.code, file=sys.stderr)
+559       raise CloneFailure()
+560     except urllib.error.URLError as e:
+561       _print('fatal: Cannot get %s' % url, file=sys.stderr)
+562       _print('fatal: error %s' % e.reason, file=sys.stderr)
+563       raise CloneFailure()
+564     try:
+565       if not quiet:
+566         _print('Get %s' % url, file=sys.stderr)
+567       while True:
+568         buf = r.read(8192)
+569         if buf == '':
+570           return True
+571         dest.write(buf)
+572     finally:
+573       r.close()
+574   finally:
+575     dest.close()
+576 
+577 
+578 def _ImportBundle(local):
+579   path = os.path.join(local, '.git', 'clone.bundle')
+580   try:
+581     _Fetch(local, local, path, True)
+582   finally:
+583     os.remove(path)
+584 
+585 
+586 def _Clone(url, local, quiet, clone_bundle):
+587   """Clones a git repository to a new subdirectory of repodir
+588   """
+589   try:
+590     os.mkdir(local)
+591   except OSError as e:
+592     _print('fatal: cannot make %s directory: %s' % (local, e.strerror),
+593            file=sys.stderr)
+594     raise CloneFailure()
+595 
+596   cmd = [GIT, 'init', '--quiet']
+597   try:
+598     proc = subprocess.Popen(cmd, cwd=local)
+599   except OSError as e:
+600     _print(file=sys.stderr)
+601     _print("fatal: '%s' is not available" % GIT, file=sys.stderr)
+602     _print('fatal: %s' % e, file=sys.stderr)
+603     _print(file=sys.stderr)
+604     _print('Please make sure %s is installed and in your path.' % GIT,
+605            file=sys.stderr)
+606     raise CloneFailure()
+607   if proc.wait() != 0:
+608     _print('fatal: could not create %s' % local, file=sys.stderr)
+609     raise CloneFailure()
+610 
+611   _InitHttp()
+612   _SetConfig(local, 'remote.origin.url', url)
+613   _SetConfig(local,
+614              'remote.origin.fetch',
+615              '+refs/heads/*:refs/remotes/origin/*')
+616   if clone_bundle and _DownloadBundle(url, local, quiet):
+617     _ImportBundle(local)
+618   _Fetch(url, local, 'origin', quiet)
+619 
+620 
+621 def _Verify(cwd, branch, quiet):
+622   """Verify the branch has been signed by a tag.
+623   """
+624   cmd = [GIT, 'describe', 'origin/%s' % branch]
+625   proc = subprocess.Popen(cmd,
+626                           stdout=subprocess.PIPE,
+627                           stderr=subprocess.PIPE,
+628                           cwd=cwd)
+629   cur = proc.stdout.read().strip()
+630   proc.stdout.close()
+631 
+632   proc.stderr.read()
+633   proc.stderr.close()
+634 
+635   if proc.wait() != 0 or not cur:
+636     _print(file=sys.stderr)
+637     _print("fatal: branch '%s' has not been signed" % branch, file=sys.stderr)
+638     raise CloneFailure()
+639 
+640   m = re.compile(r'^(.*)-[0-9]{1,}-g[0-9a-f]{1,}$').match(cur)
+641   if m:
+642     cur = m.group(1)
+643     if not quiet:
+644       _print(file=sys.stderr)
+645       _print("info: Ignoring branch '%s'; using tagged release '%s'"
+646              % (branch, cur), file=sys.stderr)
+647       _print(file=sys.stderr)
+648 
+649   env = os.environ.copy()
+650   try:
+651     env['GNUPGHOME'] = gpg_dir
+652   except UnicodeEncodeError:
+653     env['GNUPGHOME'] = gpg_dir.encode()
+654 
+655   cmd = [GIT, 'tag', '-v', cur]
+656   proc = subprocess.Popen(cmd,
+657                           stdout=subprocess.PIPE,
+658                           stderr=subprocess.PIPE,
+659                           cwd=cwd,
+660                           env=env)
+661   out = proc.stdout.read()
+662   proc.stdout.close()
+663 
+664   err = proc.stderr.read()
+665   proc.stderr.close()
+666 
+667   if proc.wait() != 0:
+668     _print(file=sys.stderr)
+669     _print(out, file=sys.stderr)
+670     _print(err, file=sys.stderr)
+671     _print(file=sys.stderr)
+672     raise CloneFailure()
+673   return '%s^0' % cur
+674 
+675 
+676 def _Checkout(cwd, branch, rev, quiet):
+677   """Checkout an upstream branch into the repository and track it.
+678   """
+679   cmd = [GIT, 'update-ref', 'refs/heads/default', rev]
+680   if subprocess.Popen(cmd, cwd=cwd).wait() != 0:
+681     raise CloneFailure()
+682 
+683   _SetConfig(cwd, 'branch.default.remote', 'origin')
+684   _SetConfig(cwd, 'branch.default.merge', 'refs/heads/%s' % branch)
+685 
+686   cmd = [GIT, 'symbolic-ref', 'HEAD', 'refs/heads/default']
+687   if subprocess.Popen(cmd, cwd=cwd).wait() != 0:
+688     raise CloneFailure()
+689 
+690   cmd = [GIT, 'read-tree', '--reset', '-u']
+691   if not quiet:
+692     cmd.append('-v')
+693   cmd.append('HEAD')
+694   if subprocess.Popen(cmd, cwd=cwd).wait() != 0:
+695     raise CloneFailure()
+696 
+697 
+698 def _FindRepo():
+699   """Look for a repo installation, starting at the current directory.
+700   """
+701   curdir = os.getcwd()
+702   repo = None
+703 
+704   olddir = None
+705   while curdir != '/' \
+706           and curdir != olddir \
+707           and not repo:
+708     repo = os.path.join(curdir, repodir, REPO_MAIN)
+709     if not os.path.isfile(repo):
+710       repo = None
+711       olddir = curdir
+712       curdir = os.path.dirname(curdir)
+713   return (repo, os.path.join(curdir, repodir))
+714 
+715 
+716 class _Options(object):
+717   help = False
+718 
+719 
+720 def _ParseArguments(args):
+721   cmd = None
+722   opt = _Options()
+723   arg = []
+724 
+725   for i in range(len(args)):
+726     a = args[i]
+727     if a == '-h' or a == '--help':
+728       opt.help = True
+729 
+730     elif not a.startswith('-'):
+731       cmd = a
+732       arg = args[i + 1:]
+733       break
+734   return cmd, opt, arg
+735 
+736 
+737 def _Usage():
+738   gitc_usage = ""
+739   if get_gitc_manifest_dir():
+740     gitc_usage = "  gitc-init Initialize a GITC Client.\n"
+741 
+742   _print(
+743       """usage: repo COMMAND [ARGS]
+744 
+745 repo is not yet installed.  Use "repo init" to install it here.
+746 
+747 The most commonly used repo commands are:
+748 
+749   init      Install repo in the current working directory
+750 """ + gitc_usage +
+751       """  help      Display detailed help on a command
+752 
+753 For access to the full online help, install repo ("repo init").
+754 """, file=sys.stderr)
+755   sys.exit(1)
+756 
+757 
+758 def _Help(args):
+759   if args:
+760     if args[0] == 'init':
+761       init_optparse.print_help()
+762       sys.exit(0)
+763     elif args[0] == 'gitc-init':
+764       _GitcInitOptions(init_optparse)
+765       init_optparse.print_help()
+766       sys.exit(0)
+767     else:
+768       _print("error: '%s' is not a bootstrap command.\n"
+769              '        For access to online help, install repo ("repo init").'
+770              % args[0], file=sys.stderr)
+771   else:
+772     _Usage()
+773   sys.exit(1)
+774 
+775 
+776 def _NotInstalled():
+777   _print('error: repo is not installed.  Use "repo init" to install it here.',
+778          file=sys.stderr)
+779   sys.exit(1)
+780 
+781 
+782 def _NoCommands(cmd):
+783   _print("""error: command '%s' requires repo to be installed first.
+784          Use "repo init" to install it here.""" % cmd, file=sys.stderr)
+785   sys.exit(1)
+786 
+787 
+788 def _RunSelf(wrapper_path):
+789   my_dir = os.path.dirname(wrapper_path)
+790   my_main = os.path.join(my_dir, 'main.py')
+791   my_git = os.path.join(my_dir, '.git')
+792 
+793   if os.path.isfile(my_main) and os.path.isdir(my_git):
+794     for name in ['git_config.py',
+795                  'project.py',
+796                  'subcmds']:
+797       if not os.path.exists(os.path.join(my_dir, name)):
+798         return None, None
+799     return my_main, my_git
+800   return None, None
+801 
+802 
+803 def _SetDefaultsTo(gitdir):
+804   global REPO_URL
+805   global REPO_REV
+806 
+807   REPO_URL = gitdir
+808   proc = subprocess.Popen([GIT,
+809                            '--git-dir=%s' % gitdir,
+810                            'symbolic-ref',
+811                            'HEAD'],
+812                           stdout=subprocess.PIPE,
+813                           stderr=subprocess.PIPE)
+814   REPO_REV = proc.stdout.read().strip()
+815   proc.stdout.close()
+816 
+817   proc.stderr.read()
+818   proc.stderr.close()
+819 
+820   if proc.wait() != 0:
+821     _print('fatal: %s has no current branch' % gitdir, file=sys.stderr)
+822     sys.exit(1)
+823 
+824 
+825 def main(orig_args):
+826   cmd, opt, args = _ParseArguments(orig_args)
+827 
+828   repo_main, rel_repo_dir = None, None
+829   # Don't use the local repo copy, make sure to switch to the gitc client first.
+830   if cmd != 'gitc-init':
+831     repo_main, rel_repo_dir = _FindRepo()
+832 
+833   wrapper_path = os.path.abspath(__file__)
+834   my_main, my_git = _RunSelf(wrapper_path)
+835 
+836   cwd = os.getcwd()
+837   if get_gitc_manifest_dir() and cwd.startswith(get_gitc_manifest_dir()):
+838     _print('error: repo cannot be used in the GITC local manifest directory.'
+839            '\nIf you want to work on this GITC client please rerun this '
+840            'command from the corresponding client under /gitc/',
+841            file=sys.stderr)
+842     sys.exit(1)
+843   if not repo_main:
+844     if opt.help:
+845       _Usage()
+846     if cmd == 'help':
+847       _Help(args)
+848     if not cmd:
+849       _NotInstalled()
+850     if cmd == 'init' or cmd == 'gitc-init':
+851       if my_git:
+852         _SetDefaultsTo(my_git)
+853       try:
+854         _Init(args, gitc_init=(cmd == 'gitc-init'))
+855       except CloneFailure:
+856         shutil.rmtree(os.path.join(repodir, S_repo), ignore_errors=True)
+857         sys.exit(1)
+858       repo_main, rel_repo_dir = _FindRepo()
+859     else:
+860       _NoCommands(cmd)
+861 
+862   if my_main:
+863     repo_main = my_main
+864 
+865   ver_str = '.'.join(map(str, VERSION))
+866   me = [sys.executable, repo_main,
+867         '--repo-dir=%s' % rel_repo_dir,
+868         '--wrapper-version=%s' % ver_str,
+869         '--wrapper-path=%s' % wrapper_path,
+870         '--']
+871   me.extend(orig_args)
+872   me.extend(extra_args)
+873   try:
+874     os.execv(sys.executable, me)
+875   except OSError as e:
+876     _print("fatal: unable to start %s" % repo_main, file=sys.stderr)
+877     _print("fatal: %s" % e, file=sys.stderr)
+878     sys.exit(148)
+879 
+880 
+881 if __name__ == '__main__':
+882   if ver[0] == 3:
+883     _print('warning: Python 3 support is currently experimental. YMMV.\n'
+884            'Please use Python 2.6 - 2.7 instead.',
+885            file=sys.stderr)
+886   main(sys.argv[1:])
