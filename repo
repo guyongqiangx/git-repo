@@ -177,6 +177,13 @@
 第112~137行：导入脚本需要使用的模块
 
 其中，第129行开始，检查python解释器的版本，根据不同版本对urllib进行不同的处理，为不同版本解释器访问urllib库使用统一的接口。
+Python3中，urllib包含多个子模块：
+- urllib.request
+- urllib.error
+- urllib.parse
+- urllib.robotparser
+
+Python2中，urllib和urllib2功能不同，这里使用imp.new_module('urllib')新生成'urllib'，得到的urllib同原生库urllib的内容是完全不一样。
 
 ```
 140 def _print(*objects, **kwargs):
@@ -186,6 +193,17 @@
 144   out.write(sep.join(objects) + end)
 145 
 146 
+```
+第140~144行：Python2和Python3的print函数不一样，无法直接使用，所以这里定义新的_print函数，用于打印输出信息。
+也可以在python2分支通过 __future__ 模块来导入python3的print函数达到同样的效果：
+```
+from __future__ import print_function
+
+# call print like in python3
+# print('...')
+```
+
+```
 147 # Python version check
 148 ver = sys.version_info
 149 if (ver[0], ver[1]) < MIN_PYTHON_VERSION:
@@ -194,9 +212,17 @@
 152          % sys.version.split(' ')[0], file=sys.stderr)
 153   sys.exit(1)
 154 
+```
+第147~153行：检查python版本，如果低于前面定义的2.6版本，则退出脚本执行。
+
+```
 155 home_dot_repo = os.path.expanduser('~/.repoconfig')
 156 gpg_dir = os.path.join(home_dot_repo, 'gnupg')
 157 
+```
+第155~156行：定义了repo使用的配置文件目录，以及配置目录下的gnupg路径。
+
+```
 158 extra_args = []
 159 init_optparse = optparse.OptionParser(usage="repo init -u url [options]")
 160 
@@ -265,6 +291,71 @@
 223                  help='Always prompt for name/e-mail')
 224 
 225 
+```
+第158~223行：定义了repo子命令'init'的参数选项，看起来很乱，实际上很简单，主要包括4组：
+  - Logging
+    - '-q'
+  - Manifest
+    - '-u'
+    - '-b'
+    - '-m'
+    - '--mirror'
+    - '--reference'
+    - '--depth'
+    - '--archive'
+    - '-g'
+    - '-p'
+    - '--no-clone-bundle'
+  - Tool
+    - '--repo-url'
+    - '--repo-branch'
+    - '--no-repo-verify'
+  - Other
+    - '--config-name'
+可以在命令行执行`repo init -h`查看最终生成的帮助信息：
+```
+$ repo init -h
+Usage: repo init -u url [options]
+
+Options:
+  -h, --help            show this help message and exit
+
+  Logging options:
+    -q, --quiet         be quiet
+
+  Manifest options:
+    -u URL, --manifest-url=URL
+                        manifest repository location
+    -b REVISION, --manifest-branch=REVISION
+                        manifest branch or revision
+    -m NAME.xml, --manifest-name=NAME.xml
+                        initial manifest file
+    --mirror            create a replica of the remote repositories rather
+                        than a client working directory
+    --reference=DIR     location of mirror directory
+    --depth=DEPTH       create a shallow clone with given depth; see git clone
+    --archive           checkout an archive instead of a git repository for
+                        each project. See git archive.
+    -g GROUP, --groups=GROUP
+                        restrict manifest projects to ones with specified
+                        group(s) [default|all|G1,G2,G3|G4,-G5,-G6]
+    -p PLATFORM, --platform=PLATFORM
+                        restrict manifest projects to ones with a specified
+                        platform group [auto|all|none|linux|darwin|...]
+    --no-clone-bundle   disable use of /clone.bundle on HTTP/HTTPS
+
+  repo Version options:
+    --repo-url=URL      repo repository location
+    --repo-branch=REVISION
+                        repo branch or revision
+    --no-repo-verify    do not verify repo source code
+
+  Other options:
+    --config-name       Always prompt for name/e-mail
+```
+选项的帮助信息比较清楚，其作用在分析`repo init`命令时进一步说明。
+
+```
 226 def _GitcInitOptions(init_optparse_arg):
 227   init_optparse_arg.set_usage("repo gitc-init -u url -c client [options]")
 228   g = init_optparse_arg.add_option_group('GITC options')
@@ -402,6 +493,9 @@
 360     raise
 361 
 362 
+```
+
+```
 363 def ParseGitVersion(ver_str):
 364   if not ver_str.startswith('git version '):
 365     return None
@@ -416,6 +510,9 @@
 374   return tuple(to_tuple)
 375 
 376 
+```
+
+```
 377 def _CheckGitVersion():
 378   cmd = [GIT, '--version']
 379   try:
@@ -444,6 +541,9 @@
 402     raise CloneFailure()
 403 
 404 
+```
+
+```
 405 def NeedSetupGnuPG():
 406   if not os.path.isdir(home_dot_repo):
 407     return True
