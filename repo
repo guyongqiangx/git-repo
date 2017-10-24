@@ -205,7 +205,9 @@ from __future__ import print_function
 
 ```
 147 # Python version check
+    # 获取系统版本
 148 ver = sys.version_info
+    # 检查系统版本是否低于前面定义的2.6
 149 if (ver[0], ver[1]) < MIN_PYTHON_VERSION:
 150   _print('error: Python version %s unsupported.\n'
 151          'Please use Python 2.6 - 2.7 instead.'
@@ -216,7 +218,9 @@ from __future__ import print_function
 第147~153行：检查python版本，如果低于前面定义的2.6版本，则退出脚本执行。
 
 ```
+    # 定义home_dot_repo，如：/home/guyongqiangx/.repoconfig
 155 home_dot_repo = os.path.expanduser('~/.repoconfig')
+    # 定义gpg_dir，如：/home/guyongqiangx/.repoconfig/gnupg
 156 gpg_dir = os.path.join(home_dot_repo, 'gnupg')
 157 
 ```
@@ -224,6 +228,7 @@ from __future__ import print_function
 
 ```
 158 extra_args = []
+    # 使用optparse创建init子命令的选项
 159 init_optparse = optparse.OptionParser(usage="repo init -u url [options]")
 160 
 161 # Logging
@@ -407,12 +412,16 @@ Options:
 274   return gitc_fs_path.split(GITC_FS_ROOT_DIR)[1].split('/')[0]
 275 
 276 
+```
+
+    # 定义ConeFailure类，没有具体实现
 277 class CloneFailure(Exception):
 278 
 279   """Indicate the remote clone of repo itself failed.
 280   """
 281 
 282 
+    # init子命令
 283 def _Init(args, gitc_init=False):
 284   """Installs repo by cloning it over the network.
 285   """
@@ -496,66 +505,88 @@ Options:
 ```
 
 ```
+    # 解析命令'git --version'返回的字符串，如：'git version 1.9.1'
 363 def ParseGitVersion(ver_str):
+      # 检查是否以 'git version'开头
 364   if not ver_str.startswith('git version '):
 365     return None
 366 
+      # 获取 'git version 1.9.1'后面指示版本的数字部分，如'1.9.1'
+      # 不清楚这里为什么会使用'-'进行分割？某些版本存在类似'1.9.1-xxxx'的字符串么？
 367   num_ver_str = ver_str[len('git version '):].strip().split('-')[0]
 368   to_tuple = []
+      # 对'1.9.1'使用'.'进行分割，并获取前面3项，即'1', '9', '1'
 369   for num_str in num_ver_str.split('.')[:3]:
 370     if num_str.isdigit():
 371       to_tuple.append(int(num_str))
 372     else:
 373       to_tuple.append(0)
+      # 返回获取的数字版本，如(1, 9, 1)
 374   return tuple(to_tuple)
 375 
 376 
-```
-
-```
+    # 运行'git --version'命令，并检查其版本
 377 def _CheckGitVersion():
+      # 构造'git --version'命令
 378   cmd = [GIT, '--version']
 379   try:
+        # 执行'git --version'命令，并通过stdout=subprocess.PIPE设置接收命令输出
 380     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-381   except OSError as e:
+381   except OSError as e: # 没有安装git时，命令执行出错
 382     _print(file=sys.stderr)
 383     _print("fatal: '%s' is not available" % GIT, file=sys.stderr)
 384     _print('fatal: %s' % e, file=sys.stderr)
 385     _print(file=sys.stderr)
 386     _print('Please make sure %s is installed and in your path.' % GIT,
 387            file=sys.stderr)
+        # 将错误抛给外层
 388     raise CloneFailure()
 389 
+
+      # 从管道的标准输出获取git版本字符串，如：'git version 1.9.1'
 390   ver_str = proc.stdout.read().strip()
+      # 关闭管道
 391   proc.stdout.close()
 392   proc.wait()
 393 
+      # 解析前面取得的字符串，如：'git version 1.9.1'，解析后返回(1,9,1)
 394   ver_act = ParseGitVersion(ver_str)
+      # 解析版本失败（如果字符串不是以'git version'开头就会失败）
 395   if ver_act is None:
 396     _print('error: "%s" unsupported' % ver_str, file=sys.stderr)
 397     raise CloneFailure()
 398 
+      # 检查当前获得的版本是否低于前面定义的最低版本(1,7,2)
 399   if ver_act < MIN_GIT_VERSION:
 400     need = '.'.join(map(str, MIN_GIT_VERSION))
+        # 提示支持的最低版本1.7.2
 401     _print('fatal: git %s or later required' % need, file=sys.stderr)
 402     raise CloneFailure()
 403 
 404 
 ```
+第363~402行：定义了两个函数ParseGitVersion和_CheckGitVersion用于检查git版本是否低于(1,7,2)
 
 ```
+    # 读取 '~/.repoconfig/keyring-version'文件并检查版本是否低于1.2
+    # 读取失败或版本低于1.2，都需要重新设置PGP Key
 405 def NeedSetupGnuPG():
+      # 检查 '~/.repoconfig' 是否为目录 (有两种情况: 1. 不存在；2. 存在，但不是目录)
+      # 如果 '~/.repoconfig' 目录不存在，则返回True，表明需要设置PGP Key
 406   if not os.path.isdir(home_dot_repo):
 407     return True
 408 
+      # 检查 '~/.repoconfig/keyring-version'文件
 409   kv = os.path.join(home_dot_repo, 'keyring-version')
 410   if not os.path.exists(kv):
 411     return True
 412 
+      # 读取 '~/.repoconfig/keyring-version'文件
 413   kv = open(kv).read()
 414   if not kv:
 415     return True
 416 
+      # 获取Keyring版本，并检查是否低于第29行定义的1.2
 417   kv = tuple(map(int, kv.split('.')))
 418   if kv < KEYRING_VERSION:
 419     return True
@@ -563,6 +594,7 @@ Options:
 421 
 422 
 423 def SetupGnuPG(quiet):
+      # 尝试生成目录 '~/.repoconfig'
 424   try:
 425     os.mkdir(home_dot_repo)
 426   except OSError as e:
@@ -571,6 +603,7 @@ Options:
 429              % (home_dot_repo, e.strerror), file=sys.stderr)
 430       sys.exit(1)
 431 
+      # 尝试以S_IRWXU权限生成 '~/.repoconfig/gnupg'目录
 432   try:
 433     os.mkdir(gpg_dir, stat.S_IRWXU)
 434   except OSError as e:
@@ -579,13 +612,17 @@ Options:
 437              file=sys.stderr)
 438       sys.exit(1)
 439 
+      # 获取环境变量的一个副本进行改变，并只影响接下来使用这个env的线程
 440   env = os.environ.copy()
+      # 添加'GNUPGHOME'环境变量
 441   try:
 442     env['GNUPGHOME'] = gpg_dir
 443   except UnicodeEncodeError:
 444     env['GNUPGHOME'] = gpg_dir.encode()
 445 
+      # 执行'pgp --import'命令
 446   cmd = ['gpg', '--import']
+      # 使用stdout=subprocess.PIPE建立管道通信
 447   try:
 448     proc = subprocess.Popen(cmd,
 449                             env=env,
@@ -597,20 +634,28 @@ Options:
 455       _print(file=sys.stderr)
 456     return False
 457 
+      # 将 MAINTAINER_KEYS 作为 'gpg --import'的输入数据，类似：'gpt --import $MAINTAINER_KEYS'
 458   proc.stdin.write(MAINTAINER_KEYS)
 459   proc.stdin.close()
 460 
+      # 等待'gpt --import'命令执行结束
 461   if proc.wait() != 0:
 462     _print('fatal: registering repo maintainer keys failed', file=sys.stderr)
 463     sys.exit(1)
 464   _print()
 465 
+      # 往 '~/.repoconfig/keyring-version' 写入版本 1.2
 466   fd = open(os.path.join(home_dot_repo, 'keyring-version'), 'w')
 467   fd.write('.'.join(map(str, KEYRING_VERSION)) + '\n')
 468   fd.close()
 469   return True
 470 
 471 
+```
+第405~471行：定义了NeedSetupGnuPG和SetupGnuPG两个函数，其中SetupGnuPG调用NeedSetupGnuPG检查设置导入第57~131行的PGP key数据
+
+```
+    # 执行 'git config xxxx'命令
 472 def _SetConfig(local, name, value):
 473   """Set a git configuration option to the specified value.
 474   """
@@ -619,6 +664,10 @@ Options:
 477     raise CloneFailure()
 478 
 479 
+```
+第472~477行：定义_SetConfig函数用于执行'git config xxxx'命令
+
+```
 480 def _InitHttp():
 481   handlers = []
 482 
@@ -897,11 +946,16 @@ Options:
 755   sys.exit(1)
 756 
 757 
+```
+
+```
 758 def _Help(args):
 759   if args:
+        # 'init'子命令的帮助，'repo init --help'
 760     if args[0] == 'init':
 761       init_optparse.print_help()
 762       sys.exit(0)
+        # 'gitc-init'子命令的帮助，'repo gitc-init --help'
 763     elif args[0] == 'gitc-init':
 764       _GitcInitOptions(init_optparse)
 765       init_optparse.print_help()
@@ -915,18 +969,24 @@ Options:
 773   sys.exit(1)
 774 
 775 
+    # repo脚本没有安装的帮助提示信息
 776 def _NotInstalled():
 777   _print('error: repo is not installed.  Use "repo init" to install it here.',
 778          file=sys.stderr)
 779   sys.exit(1)
 780 
 781 
+    # 没有找到repo命令的帮助提示信息
 782 def _NoCommands(cmd):
 783   _print("""error: command '%s' requires repo to be installed first.
 784          Use "repo init" to install it here.""" % cmd, file=sys.stderr)
 785   sys.exit(1)
 786 
 787 
+```
+第758~785行：定义了_Help, _NotInstalled和_NoCommands三个函数，用于显示帮助提示信息
+
+```
 788 def _RunSelf(wrapper_path):
 789   my_dir = os.path.dirname(wrapper_path)
 790   my_main = os.path.join(my_dir, 'main.py')
