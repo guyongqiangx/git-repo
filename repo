@@ -183,7 +183,8 @@ Python3中，urllib包含多个子模块：
 - urllib.parse
 - urllib.robotparser
 
-Python2中，urllib和urllib2功能不同，这里使用imp.new_module('urllib')新生成'urllib'，得到的urllib同原生库urllib的内容是完全不一样。
+Python2中，urllib和urllib2功能不同，这里使用imp.new_module('urllib')生成一个名为'urllib'空白库，然后将urllib2作为其request和error成员的实现，因此这里生成的urllib同系统自带的urllib库是不一样的，只是名字相同而已。
+也可以理解为使用Python2现有库构造一个Python3使用方式一样的urllib库。
 
 ```
 140 def _print(*objects, **kwargs):
@@ -297,10 +298,10 @@ from __future__ import print_function
 224 
 225 
 ```
-第158~223行：定义了repo子命令'init'的参数选项，看起来很乱，实际上很简单，主要包括4组：
-  - Logging
+第158~223行：定义了repo子命令'init'的参数选项init_optparse，看起来很乱，实际上很简单，主要包括4组：
+  - Logging options
     - '-q'
-  - Manifest
+  - Manifest options
     - '-u'
     - '-b'
     - '-m'
@@ -311,11 +312,11 @@ from __future__ import print_function
     - '-g'
     - '-p'
     - '--no-clone-bundle'
-  - Tool
+  - Tool/repo Version options
     - '--repo-url'
     - '--repo-branch'
     - '--no-repo-verify'
-  - Other
+  - Other options
     - '--config-name'
 可以在命令行执行`repo init -h`查看最终生成的帮助信息：
 ```
@@ -622,7 +623,7 @@ Options:
 445 
       # 执行'pgp --import'命令
 446   cmd = ['gpg', '--import']
-      # 使用stdout=subprocess.PIPE建立管道通信
+      # 使用stdin=subprocess.PIPE建立管道通信，通过管道stdin向执行的命令提供输入
 447   try:
 448     proc = subprocess.Popen(cmd,
 449                             env=env,
@@ -634,6 +635,7 @@ Options:
 455       _print(file=sys.stderr)
 456     return False
 457 
+      # 由于前面Popen时指定了stdin=subprocess.PIPE，所以这里可以通过管道输入数据
       # 将 MAINTAINER_KEYS 作为 'gpg --import'的输入数据，类似：'gpt --import $MAINTAINER_KEYS'
 458   proc.stdin.write(MAINTAINER_KEYS)
 459   proc.stdin.close()
@@ -904,27 +906,49 @@ Options:
 713   return (repo, os.path.join(curdir, repodir))
 714 
 715 
+```
+
+```
+    # 定义辅助类_Options，其help成员用于指示命令行参数是否带有'-h'/'--help'选项
 716 class _Options(object):
 717   help = False
 718 
 719 
+    # 解析main函数接收到的参数列表
+    # args = ['init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1']
 720 def _ParseArguments(args):
 721   cmd = None
 722   opt = _Options()
 723   arg = []
 724 
+      # 循环列表args的每一项
 725   for i in range(len(args)):
 726     a = args[i]
+        # 如果是'-h'/'--help'，设置opt.help=True
 727     if a == '-h' or a == '--help':
 728       opt.help = True
 729 
+        # 将不以'-'开头的第一项项作为cmd
 730     elif not a.startswith('-'):
 731       cmd = a
 732       arg = args[i + 1:]
+          #找到不以'-h'开始的项后跳出for循环，所以这里仅将第一个不以'-'开始的项作为cmd
 733       break
 734   return cmd, opt, arg
 735 
-736 
+736
+```
+第716~734行：定义了参数解析函数_ParseArguments，将args分解为三类：cmd, opt和arg：
+- cmd，指执行repo时的子命令
+- opt，用于检查命令行是否带有'-h'或'--help'选项，如果带有，则会标记opt.help=True
+- arg，执行repo命令时，除去子命令和'-h'/'--help'外的其余参数项
+
+对于参数args = ['init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1']，这里解析得到的结果是：
+- cmd: 'init'
+- opt.help = False
+- arg: ['-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1']
+
+``` 
 737 def _Usage():
 738   gitc_usage = ""
 739   if get_gitc_manifest_dir():
@@ -987,26 +1011,48 @@ Options:
 第758~785行：定义了_Help, _NotInstalled和_NoCommands三个函数，用于显示帮助提示信息
 
 ```
+    # 检查运行的是repo库自身的repo脚本还是'~/bin'目录下的repo脚本
+    # 如果是repo库自身的repo脚本，则返回其下'main.py'文件和'.git'目录的路径
 788 def _RunSelf(wrapper_path):
+      # 返回wrapper_path路径的上层目录，如：/home/guyongqiangx/bin
 789   my_dir = os.path.dirname(wrapper_path)
+      # 构造'main.py'文件的完整路径，如：'/home/guyongqiangx/bin/main.py'
 790   my_main = os.path.join(my_dir, 'main.py')
+      # 构造'.git'目录的完整路径，如：'/home/guyongqiangx/bin/.git' 
 791   my_git = os.path.join(my_dir, '.git')
 792 
+      #在文件'main.py'和目录'.git'存在的情况下继续检查其'git_config.py', 'project.py'和'subcmds'是否存在
 793   if os.path.isfile(my_main) and os.path.isdir(my_git):
 794     for name in ['git_config.py',
 795                  'project.py',
 796                  'subcmds']:
+          # 指定检查的某个文件或目录不存在，认为这里执行的不是当前目录下的repo本身
 797       if not os.path.exists(os.path.join(my_dir, name)):
 798         return None, None
+        # 运行到这里，说明前面指定的文件和目录都存在，执行的是repo库里的repo文件
+        # 返回当前repo库下'main.py'和'.git'的路径
 799     return my_main, my_git
+      # 'main.py'和'.git'不存在的情况下，直接返回两个None
 800   return None, None
 801 
 802 
+```
+第788~800行：定义了_RunSelf函数，主要用于检查当前执行的repo脚本是否是一个完整的repo库里的文件。
+因为当完成repo库的clone后，repo脚本有两份：
+- 一份在'~/bin/repo'
+- 一份在clone的repo库的根目录下
+对于repo库目录下的repo脚本，其同一目录下还有其它文件和目录，如：'main.py', '.git', 'git_config.py', 'project.py', 'subcmds'等，因此如果这些文件或目录存在，说明执行的是repo库里面的repo脚本
+
+```
 803 def _SetDefaultsTo(gitdir):
 804   global REPO_URL
 805   global REPO_REV
 806 
+      # 将指定的gitdir设置为REPO_URL复制的地址
 807   REPO_URL = gitdir
+      # 构造命令'git --git-dir=xxx/.git symbolic-ref HEAD'命令，并建立管道通信
+      # 这里通过'git symbolic-ref HEAD'命令来获取当前HEAD的引用版本，'--git-dir=<path>' 参数指定库的位置。
+      # 例如执行：'$ git symbolic-ref HEAD'，返回的结果是 'refs/heads/master'
 808   proc = subprocess.Popen([GIT,
 809                            '--git-dir=%s' % gitdir,
 810                            'symbolic-ref',
@@ -1024,7 +1070,17 @@ Options:
 822     sys.exit(1)
 823 
 824 
+```
+第803~822行：定义了_SetDefaultsTo函数，解析当前.git目录下的repo库，提取其路径和引用版本来设置REPO_URL和REPO_REV
+
+```
+    # 以android官方的init命令为例，则这里main函数收到的参数为：
+    # orig_args = ['init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1']
 825 def main(orig_args):
+      # 解析列表参数orig_args，对于'init'命令，解析返回的结果为：
+      # - cmd: 'init'
+      # - opt.help = False
+      # - arg: ['-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1']
 826   cmd, opt, args = _ParseArguments(orig_args)
 827 
 828   repo_main, rel_repo_dir = None, None
@@ -1032,9 +1088,16 @@ Options:
 830   if cmd != 'gitc-init':
 831     repo_main, rel_repo_dir = _FindRepo()
 832 
+      # 使用__file__返回当前执行repo脚本所在的路径
+      # 默认repo放在'~/bin'目录下，所以这里是'~/bin/repo'扩展后的路径
+      # 例如：'/home/guyongqiangx/bin/repo'
 833   wrapper_path = os.path.abspath(__file__)
+      # 调用函数_RunSelf检查当前执行的repo脚本路径下是否有一个完整的repo库
+      # 如果是完整的库，则返回其库下文件'main.py'和目录'.git'的路径
+      # 如果不是完整的库，则返回结果是None
 834   my_main, my_git = _RunSelf(wrapper_path)
 835 
+      # 获取当前路径
 836   cwd = os.getcwd()
 837   if get_gitc_manifest_dir() and cwd.startswith(get_gitc_manifest_dir()):
 838     _print('error: repo cannot be used in the GITC local manifest directory.'
@@ -1042,15 +1105,22 @@ Options:
 840            'command from the corresponding client under /gitc/',
 841            file=sys.stderr)
 842     sys.exit(1)
+      # repo_main为空的情况，说明当前执行的repo脚本还没有一个完整的库
 843   if not repo_main:
+        # _ParseArguments会设置otp.help标志，用于指示是否需要显示帮助信息
 844     if opt.help:
 845       _Usage()
+        # 好吧，这里还有个单独的'help'命令，跟带'-h'/'--help'选项还不一样
 846     if cmd == 'help':
 847       _Help(args)
+        # 'repo'执行不带命令的情况，显示相关帮助信息，并显示没有安装repo库的信息
 848     if not cmd:
 849       _NotInstalled()
+        # 检查是否'init'或'gitc-init'命令
 850     if cmd == 'init' or cmd == 'gitc-init':
+          # 如果存在'.git'目录
 851       if my_git:
+            # 提取其路径和引用版本来更新REPO_URL和REPO_REV
 852         _SetDefaultsTo(my_git)
 853       try:
 854         _Init(args, gitc_init=(cmd == 'gitc-init'))
@@ -1058,6 +1128,7 @@ Options:
 856         shutil.rmtree(os.path.join(repodir, S_repo), ignore_errors=True)
 857         sys.exit(1)
 858       repo_main, rel_repo_dir = _FindRepo()
+        # 当前执行位置没有repo库，却又想执行repo命令的情况下，提示没有找到该命令，需要先安装repo库
 859     else:
 860       _NoCommands(cmd)
 861 
@@ -1080,9 +1151,21 @@ Options:
 878     sys.exit(148)
 879 
 880 
+```
+第825~880行：定义了main函数，通过调用其它的函数，实现了repo脚本的主要执行逻辑
+
+```
+    # repo脚本的主入口，以android官方的'init'命令为例：
+    # 'repo init -u https://android.googlesource.com/platform/manifest -b android-4.0.1_r1'
 881 if __name__ == '__main__':
+      # 第148行获取了系统版本：ver = sys.version_info，如果运行的环境是Python3，打印提示消息
 882   if ver[0] == 3:
 883     _print('warning: Python 3 support is currently experimental. YMMV.\n'
 884            'Please use Python 2.6 - 2.7 instead.',
 885            file=sys.stderr)
+      # 命令行解析参数时：
+      # 如：'repo init -u https://android.googlesource.com/platform/manifest -b android-4.0.1_r1'
+      # 则：argv = ['repo', 'init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1']
+      # 这里将'repo'外的其余参数传给main函数
 886   main(sys.argv[1:])
+第881~886行：repo脚本执行的入口，以
