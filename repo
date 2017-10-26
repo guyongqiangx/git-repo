@@ -1242,13 +1242,28 @@ Options:
 863     repo_main = my_main
 864 
       '''
-      对于repo init命令，最终构建命令字符串并执行：
-          '.repo/repo_main.py 
-             --repo-dir=.repo 
-             --wrapper-version=1.23 
-             --wrapper-path=~/.bin/repo 
-             --init -u https://android.googlesource.com/platform/manifest -b android-4.0.1_r1
-             --repo-url=$REPO_URL --repo-branch=$REPO_REV'
+      对于repo init命令：'repo init -u https://android.googlesource.com/platform/manifest -b android-4.0.1_r1'
+      最终构建的me如下：
+        ['/usr/bin/python', 
+            '/local/public/users/ygu/test/.repo/repo/main.py', 
+            '--repo-dir=/local/public/users/ygu/test/.repo', 
+            '--wrapper-version=1.23', 
+            '--wrapper-path=/local/public/users/ygu/test/repo', 
+            '--', 
+            'init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1', 
+            '--repo-url=https://gerrit.googlesource.com/git-repo', 
+            '--repo-branch=stable']
+
+      对于repo sync命令：'repo sync'
+      最终构建ne如下：
+        ['/usr/bin/python', 
+            '/local/public/users/ygu/test/.repo/repo/main.py', 
+            '--repo-dir=/local/public/users/ygu/test/.repo', 
+            '--wrapper-version=1.23', 
+            '--wrapper-path=/local/public/users/ygu/test/repo', 
+            '--', 
+            'sync']
+      所以所有命令都要转到repo_main.py去执行。
       '''
 865   ver_str = '.'.join(map(str, VERSION))
 866   me = [sys.executable, repo_main,
