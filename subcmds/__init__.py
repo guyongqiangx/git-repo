@@ -1,3 +1,4 @@
+```
  1 #
  2 # Copyright (C) 2008 The Android Open Source Project
  3 #
@@ -17,14 +18,23 @@
 17 
 18 all_commands = {}
 19 
+   # 取得当前文件__init__.py的目录路径
 20 my_dir = os.path.dirname(__file__)
+   # 遍历当前目录下的文件
 21 for py in os.listdir(my_dir):
+	   # 忽略__init__.py文件
 22   if py == '__init__.py':
 23     continue
 24 
+     # 处理*.py文件
 25   if py.endswith('.py'):
+	     # 去掉'.py'后缀，取主文件名
 26     name = py[:-3]
 27 
+       # 通过主文件名获取其文件内定义的类名(Class Name)
+       # 例如：sync.py --> sync --> Sync
+       # 如果文件名中有'_'字符:
+       # 例如：cherry_pick.py --> cherry_pick --> Cherry_pick --> CherryPick
 28     clsn = name.capitalize()
 29     while clsn.find('_') > 0:
 30       h = clsn.index('_')
@@ -47,3 +57,4 @@
 47 
 48 if 'help' in all_commands:
 49   all_commands['help'].commands = all_commands
+```
