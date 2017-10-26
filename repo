@@ -996,19 +996,19 @@ Options:
 705   while curdir != '/' \
 706           and curdir != olddir \
 707           and not repo:
-        # repo = curdir/.repo/repo_main.py
+        # repo = curdir/.repo/main.py
 708     repo = os.path.join(curdir, repodir, REPO_MAIN)
-        # 检查'.repo/repo_main.py'在当前路径下是否存在
+        # 检查'.repo/main.py'在当前路径下是否存在
 709     if not os.path.isfile(repo):
 710       repo = None
 711       olddir = curdir
 712       curdir = os.path.dirname(curdir)
-      # 返回'.repo/repo_main.py'文件和'.repo'目录的完整路径
+      # 返回'.repo/main.py'文件和'.repo'目录的完整路径
 713   return (repo, os.path.join(curdir, repodir))
 714 
 715 
 ```
-第698~713行：定义了_FindRepo，用于从当前目录开始查找'.repo/repo_main.py'文件，并返回查找到的文件和其相应的'.repo'目录路径
+第698~713行：定义了_FindRepo，用于从当前目录开始查找'.repo/main.py'文件，并返回查找到的文件和其相应的'.repo'目录路径
 
 ```
     # 定义辅助类_Options，其help成员用于指示命令行参数是否带有'-h'/'--help'选项
@@ -1232,7 +1232,7 @@ Options:
             # 复制远程repo库失败，删除.repo/repo目录
 856         shutil.rmtree(os.path.join(repodir, S_repo), ignore_errors=True)
 857         sys.exit(1)
-          # 初始化完成后重新查找repo库，返回其'.repo/repo_main.py'文件和'.git'目录的完整路径
+          # 初始化完成后重新查找repo库，返回其'.repo/main.py'文件和'.git'目录的完整路径
 858       repo_main, rel_repo_dir = _FindRepo()
         # 执行repo命令是在当前执行位置没有repo库，显示提示信息
 859     else:
@@ -1255,7 +1255,7 @@ Options:
             '--repo-branch=stable']
 
       对于repo sync命令：'repo sync'
-      最终构建ne如下：
+      最终构建me如下：
         ['/usr/bin/python', 
             '/local/public/users/ygu/test/.repo/repo/main.py', 
             '--repo-dir=/local/public/users/ygu/test/.repo', 
