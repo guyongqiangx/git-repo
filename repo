@@ -415,6 +415,7 @@ Options:
 276 
 ```
 
+```
     # 定义ConeFailure类，没有具体实现
 277 class CloneFailure(Exception):
 278 
@@ -423,26 +424,39 @@ Options:
 281 
 282 
     # init子命令
+    # args: ['-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1']
 283 def _Init(args, gitc_init=False):
 284   """Installs repo by cloning it over the network.
 285   """
 286   if gitc_init:
 287     _GitcInitOptions(init_optparse)
+      # 根据init选项，解析args参数
+      # (options, args) = parser.parse_args(args=None, values=None)
+      # options存储了参数解析的结果, args存储了选项解析完后剩余的参数
+      # 解析完成后：
+      # opt.manifest-url = 'https://android.googlesource.com/platform/manifest'
+      # opt.manifest-branch = 'android-4.0.1_r1'
 288   opt, args = init_optparse.parse_args(args)
+      # 选项解析完后还有参数没有解析，可能命令出错了，这里显示init命令的帮助信息
 289   if args:
 290     init_optparse.print_usage()
 291     sys.exit(1)
 292 
+      # 获取init命令的'--repo-url=URL'项
 293   url = opt.repo_url
 294   if not url:
+        # 更新extra_args = ['--repo-url=$REPO_URL']
 295     url = REPO_URL
 296     extra_args.append('--repo-url=%s' % url)
 297 
+      # 获取init命令的'--repo-branch=REVISION'项
 298   branch = opt.repo_branch
 299   if not branch:
+        # 更新extra_args = ['--repo-url=$REPO_URL', '--repo-branch=$REPO_REV']
 300     branch = REPO_REV
 301     extra_args.append('--repo-branch=%s' % branch)
 302 
+      # 解析branch名称，只获取最右边'/'后的字符串
 303   if branch.startswith('refs/heads/'):
 304     branch = branch[len('refs/heads/'):]
 305   if branch.startswith('refs/'):
@@ -470,6 +484,7 @@ Options:
 327         # This GITC Client has already initialized repo so continue.
 328         return
 329 
+        # 创建'.repo'目录
 330     os.mkdir(repodir)
 331   except OSError as e:
 332     if e.errno != errno.EEXIST:
@@ -480,21 +495,31 @@ Options:
 337       #
 338       sys.exit(1)
 339 
+      # 检查git版本是否低于最低版本1.7.2
 340   _CheckGitVersion()
 341   try:
+        # repo使用'~/.repoconfig/keyring-version'来标记本脚本中的PGP Key是否已经导入
+        # 如果没有，则将Key导入到'~/.repoconfig/gnupg'目录
+        # 完成后使用can_verify表明可以对repo库内容进行校验
 342     if NeedSetupGnuPG():
 343       can_verify = SetupGnuPG(opt.quiet)
 344     else:
 345       can_verify = True
 346 
+        # 设置本地存放repo库的目录：'xxx/.repo/repo'
 347     dst = os.path.abspath(os.path.join(repodir, S_repo))
+        # 从远程url位置复制repo到本地dst位置
+        # 对于opt.no_clone_bundle，默认命令行不带'--no-clone-bundle'参数，所以为false
 348     _Clone(url, dst, opt.quiet, not opt.no_clone_bundle)
 349 
+        # 调用_Verify对复制的代码进行校验
+        # 对于opt.no_repo_verify，默认命令行不带'--no-repo-verify'参数，所以为false
 350     if can_verify and not opt.no_repo_verify:
 351       rev = _Verify(dst, branch, opt.quiet)
 352     else:
 353       rev = 'refs/remotes/origin/%s^0' % branch
 354 
+        # 从dst路径下检出branch分支
 355     _Checkout(dst, branch, rev, opt.quiet)
 356   except CloneFailure:
 357     if opt.quiet:
@@ -504,6 +529,13 @@ Options:
 361 
 362 
 ```
+第283~360行：定义了_Init函数，从远程复制repo库到本地，并检出相应分支。
+主要事情包括：
+1. 检查'~/.repoconfig/keyring-version'是否已经正确设置，否则导入repo脚本中的PGP Key
+2. 检查并设置远程库的url和rev
+3. 将远程repo库复制到本地dst位置
+4. 对repo库指定的rev分支进行verify操作
+5. 从repo库检出rev对应的代码
 
 ```
     # 解析命令'git --version'返回的字符串，如：'git version 1.9.1'
@@ -695,10 +727,15 @@ Options:
 502   urllib.request.install_opener(urllib.request.build_opener(*handlers))
 503 
 504 
+```
+第480~502行：定义了_InitHttp，用于初始化http连接，设置认证和proxy等参数
+
+```
 505 def _Fetch(url, local, src, quiet):
 506   if not quiet:
 507     _print('Get %s' % url, file=sys.stderr)
 508 
+      # 构建命令：'git fetch --quiet src +refs/heads/*:refs/remotes/origin/* refs/tags/*:refs/tags/*'
 509   cmd = [GIT, 'fetch']
 510   if quiet:
 511     cmd.append('--quiet')
@@ -709,6 +746,7 @@ Options:
 516   cmd.append('+refs/heads/*:refs/remotes/origin/*')
 517   cmd.append('refs/tags/*:refs/tags/*')
 518 
+      # 在local路径下执行'git fetch'命令获取'repo'库内容
 519   proc = subprocess.Popen(cmd, cwd=local, stderr=err)
 520   if err:
 521     proc.stderr.read()
@@ -717,11 +755,18 @@ Options:
 524     raise CloneFailure()
 525 
 526 
+```
+第505~526行：定义了_Fetch函数
+
+```
+    # 下载远程的clone.bundle文件到本地
 527 def _DownloadBundle(url, local, quiet):
+      # 构造 url = 'https://gerrit.googlesource.com/git-repo/clone.bundle'
 528   if not url.endswith('/'):
 529     url += '/'
 530   url += 'clone.bundle'
 531 
+      # 执行命令：'git config --get-regexp url.*.insteadof'
 532   proc = subprocess.Popen(
 533       [GIT, 'config', '--get-regexp', 'url.*.insteadof'],
 534       cwd=local,
@@ -737,12 +782,15 @@ Options:
 544   proc.stdout.close()
 545   proc.wait()
 546 
+      # 如果不是基于http或https，返回False信息
 547   if not url.startswith('http:') and not url.startswith('https:'):
 548     return False
 549 
+      # 构造本地clone.bundle文件： dest = '$local/.git/clone.bundle'
 550   dest = open(os.path.join(local, '.git', 'clone.bundle'), 'w+b')
 551   try:
 552     try:
+          # 发起远程clone.bundle文件的请求
 553       r = urllib.request.urlopen(url)
 554     except urllib.error.HTTPError as e:
 555       if e.code in [401, 403, 404, 501]:
@@ -757,6 +805,7 @@ Options:
 564     try:
 565       if not quiet:
 566         _print('Get %s' % url, file=sys.stderr)
+          # 循环读取远程的bundle文件，并写入到本地文件dest中
 567       while True:
 568         buf = r.read(8192)
 569         if buf == '':
@@ -768,17 +817,30 @@ Options:
 575     dest.close()
 576 
 577 
+```
+第527~575行：定义_DownloadBundle函数，用于下载Bundle数据到本地
+
+```
 578 def _ImportBundle(local):
+      # 本地clone.bundle文件： path = '$local/.git/clone.bundle'
 579   path = os.path.join(local, '.git', 'clone.bundle')
 580   try:
 581     _Fetch(local, local, path, True)
 582   finally:
+        # 完成后删除本地的clone.bundle文件
 583     os.remove(path)
 584 
 585 
+```
+第578~583行：定义了_ImportBundle函数，从本地的clone.bundle文件解开
+
+```
+    # url: 远程位置
+    # local: 本地路径
 586 def _Clone(url, local, quiet, clone_bundle):
 587   """Clones a git repository to a new subdirectory of repodir
 588   """
+      # 准备好本地路径local
 589   try:
 590     os.mkdir(local)
 591   except OSError as e:
@@ -786,8 +848,10 @@ Options:
 593            file=sys.stderr)
 594     raise CloneFailure()
 595 
+      # 执行命令 'git init --quiet' 对repo库进行初始化
 596   cmd = [GIT, 'init', '--quiet']
 597   try:
+        # 通过cwd=local来制定在本地路径local下执行git命令
 598     proc = subprocess.Popen(cmd, cwd=local)
 599   except OSError as e:
 600     _print(file=sys.stderr)
@@ -801,24 +865,42 @@ Options:
 608     _print('fatal: could not create %s' % local, file=sys.stderr)
 609     raise CloneFailure()
 610 
+      # 初始化http请求连接，设置认证方式、代理等参数
 611   _InitHttp()
+      # 执行命令 'git config remote.origin.url $url'
+      # 指定origin的路径
 612   _SetConfig(local, 'remote.origin.url', url)
+      # 执行命令 'git config remote.origin.fetch +refs/heads/*:refs/remotes/origin/*'
+      # 指定本地分支和origin分支的对应关系
 613   _SetConfig(local,
 614              'remote.origin.fetch',
 615              '+refs/heads/*:refs/remotes/origin/*')
+      # 如果指定clone bundle方式，下载远程的clone.bundle文件
 616   if clone_bundle and _DownloadBundle(url, local, quiet):
+        # 从bundle文件导入数据
 617     _ImportBundle(local)
 618   _Fetch(url, local, 'origin', quiet)
 619 
 620 
+```
+第586~618行：定义了_Clone函数
+
+执行的'git'命令序列包括：
+- 'git init --quiet'
+- 'git config remote.origin.url $url'
+- 'git config remote.origin.fetch +refs/heads/*:refs/remotes/origin/*'
+
+```
 621 def _Verify(cwd, branch, quiet):
 622   """Verify the branch has been signed by a tag.
 623   """
+      # 执行命令 'git describe origin/stable'
 624   cmd = [GIT, 'describe', 'origin/%s' % branch]
 625   proc = subprocess.Popen(cmd,
 626                           stdout=subprocess.PIPE,
 627                           stderr=subprocess.PIPE,
 628                           cwd=cwd)
+      # git命令的输出为当前分支的版本号
 629   cur = proc.stdout.read().strip()
 630   proc.stdout.close()
 631 
@@ -839,12 +921,15 @@ Options:
 646              % (branch, cur), file=sys.stderr)
 647       _print(file=sys.stderr)
 648 
+      # 生成环境变量的一个副本
 649   env = os.environ.copy()
+      # 添加'GNUPGHOME'='~/.repoconfig/gnupg'变量
 650   try:
 651     env['GNUPGHOME'] = gpg_dir
 652   except UnicodeEncodeError:
 653     env['GNUPGHOME'] = gpg_dir.encode()
 654 
+      # 执行命令 'git tag -v $cur' 来验证cur版本tag签名的有效性
 655   cmd = [GIT, 'tag', '-v', cur]
 656   proc = subprocess.Popen(cmd,
 657                           stdout=subprocess.PIPE,
@@ -866,20 +951,29 @@ Options:
 673   return '%s^0' % cur
 674 
 675 
+```
+第621~673行：定义了_Verify函数，用于验证指定版本PGP签名的有效性
+
+```
 676 def _Checkout(cwd, branch, rev, quiet):
 677   """Checkout an upstream branch into the repository and track it.
 678   """
+      # 执行命令：'git update-ref refs/heads/default $rev'
 679   cmd = [GIT, 'update-ref', 'refs/heads/default', rev]
 680   if subprocess.Popen(cmd, cwd=cwd).wait() != 0:
 681     raise CloneFailure()
 682 
+			# 执行命令: 'git config branch.default.remote origin'
 683   _SetConfig(cwd, 'branch.default.remote', 'origin')
+      # 执行命令：'git config branch.default.merge refs/heads/$branch'
 684   _SetConfig(cwd, 'branch.default.merge', 'refs/heads/%s' % branch)
 685 
+      # 执行命令：'gt symbolic-ref HEAD refs/heads/default'
 686   cmd = [GIT, 'symbolic-ref', 'HEAD', 'refs/heads/default']
 687   if subprocess.Popen(cmd, cwd=cwd).wait() != 0:
 688     raise CloneFailure()
 689 
+      # 执行命令：'git read-tree --reset -u' -v HEAD'
 690   cmd = [GIT, 'read-tree', '--reset', '-u']
 691   if not quiet:
 692     cmd.append('-v')
@@ -888,6 +982,10 @@ Options:
 695     raise CloneFailure()
 696 
 697 
+```
+第676~695行：定义_Checkout函数，用于从repo的git库里面检出指定版本
+
+```
 698 def _FindRepo():
 699   """Look for a repo installation, starting at the current directory.
 700   """
@@ -898,15 +996,19 @@ Options:
 705   while curdir != '/' \
 706           and curdir != olddir \
 707           and not repo:
+        # repo = curdir/.repo/repo_main.py
 708     repo = os.path.join(curdir, repodir, REPO_MAIN)
+        # 检查'.repo/repo_main.py'在当前路径下是否存在
 709     if not os.path.isfile(repo):
 710       repo = None
 711       olddir = curdir
 712       curdir = os.path.dirname(curdir)
+      # 返回'.repo/repo_main.py'文件和'.repo'目录的完整路径
 713   return (repo, os.path.join(curdir, repodir))
 714 
 715 
 ```
+第698~713行：定义了_FindRepo，用于从当前目录开始查找'.repo/repo_main.py'文件，并返回查找到的文件和其相应的'.repo'目录路径
 
 ```
     # 定义辅助类_Options，其help成员用于指示命令行参数是否带有'-h'/'--help'选项
@@ -1123,18 +1225,31 @@ Options:
             # 提取其路径和引用版本来更新REPO_URL和REPO_REV
 852         _SetDefaultsTo(my_git)
 853       try:
+            # 调用_Init执行具体的clone操作
+            # arg: ['-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1']
 854         _Init(args, gitc_init=(cmd == 'gitc-init'))
 855       except CloneFailure:
+            # 复制远程repo库失败，删除.repo/repo目录
 856         shutil.rmtree(os.path.join(repodir, S_repo), ignore_errors=True)
 857         sys.exit(1)
+          # 初始化完成后重新查找repo库，返回其'.repo/repo_main.py'文件和'.git'目录的完整路径
 858       repo_main, rel_repo_dir = _FindRepo()
-        # 当前执行位置没有repo库，却又想执行repo命令的情况下，提示没有找到该命令，需要先安装repo库
+        # 执行repo命令是在当前执行位置没有repo库，显示提示信息
 859     else:
 860       _NoCommands(cmd)
 861 
 862   if my_main:
 863     repo_main = my_main
 864 
+      '''
+      对于repo init命令，最终构建命令字符串并执行：
+          '.repo/repo_main.py 
+             --repo-dir=.repo 
+             --wrapper-version=1.23 
+             --wrapper-path=~/.bin/repo 
+             --init -u https://android.googlesource.com/platform/manifest -b android-4.0.1_r1
+             --repo-url=$REPO_URL --repo-branch=$REPO_REV'
+      '''
 865   ver_str = '.'.join(map(str, VERSION))
 866   me = [sys.executable, repo_main,
 867         '--repo-dir=%s' % rel_repo_dir,
