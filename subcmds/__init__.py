@@ -22,13 +22,13 @@
 20 my_dir = os.path.dirname(__file__)
    # 遍历当前目录下的文件
 21 for py in os.listdir(my_dir):
-	   # 忽略__init__.py文件
+     # 忽略__init__.py文件
 22   if py == '__init__.py':
 23     continue
 24 
      # 处理*.py文件
 25   if py.endswith('.py'):
-	     # 去掉'.py'后缀，取主文件名
+       # 去掉'.py'后缀，取主文件名
 26     name = py[:-3]
 27 
        # 通过主文件名获取其文件内定义的类名(Class Name)

@@ -432,7 +432,7 @@ Options:
 287     _GitcInitOptions(init_optparse)
       # 根据init选项，解析args参数
       # (options, args) = parser.parse_args(args=None, values=None)
-      # options存储了参数解析的结果, args存储了选项解析完后剩余的参数
+      # options存储参数解析的结果, args存储选项解析完后剩余的参数
       # 解析完成后：
       # opt.manifest-url = 'https://android.googlesource.com/platform/manifest'
       # opt.manifest-branch = 'android-4.0.1_r1'
@@ -1248,7 +1248,7 @@ Options:
             '/local/public/users/ygu/test/.repo/repo/main.py', 
             '--repo-dir=/local/public/users/ygu/test/.repo', 
             '--wrapper-version=1.23', 
-            '--wrapper-path=/local/public/users/ygu/test/repo', 
+            '--wrapper-path=/home/rg935739/bin/repo', 
             '--', 
             'init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1', 
             '--repo-url=https://gerrit.googlesource.com/git-repo', 
@@ -1260,7 +1260,7 @@ Options:
             '/local/public/users/ygu/test/.repo/repo/main.py', 
             '--repo-dir=/local/public/users/ygu/test/.repo', 
             '--wrapper-version=1.23', 
-            '--wrapper-path=/local/public/users/ygu/test/repo', 
+            '--wrapper-path=/home/rg935739/bin/repo', 
             '--', 
             'sync']
       所以所有命令都要转到repo_main.py去执行。

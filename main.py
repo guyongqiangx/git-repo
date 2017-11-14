@@ -1,3 +1,4 @@
+```
   1 #!/usr/bin/env python
   2 #
   3 # Copyright (C) 2008 The Android Open Source Project
@@ -23,6 +24,7 @@
  23 import sys
  24 import time
  25 
+    # 导入is_python3函数来检查Python版本，并统一'urllib'库
  26 from pyversion import is_python3
  27 if is_python3():
  28   import urllib.request
@@ -64,6 +66,17 @@
  64   input = raw_input
  65   # pylint:enable=W0622
  66 
+
+    #
+    # 构建global_options用于解析以下参数
+    # 包括：
+    #      --paginate
+    #      --no-pager
+    #      --color
+    #      --trace
+    #      --time
+    #      --version
+    #
  67 global_options = optparse.OptionParser(
  68                  usage="repo [-p|--paginate|--no-pager] COMMAND [ARGS]"
  69                  )
@@ -252,21 +265,31 @@
 252     print('no --repo-dir argument', file=sys.stderr)
 253     sys.exit(1)
 254 
+```
+
+```
 255 def _PruneOptions(argv, opt):
 256   i = 0
 257   while i < len(argv):
 258     a = argv[i]
+        # 如果遇到'--'的选项，则跳出while循环，实际上'--'项用于分隔repo库本身的参数和其它参数
 259     if a == '--':
 260       break
+        # 选项以'--'开始，则获取其'='后的部分
 261     if a.startswith('--'):
 262       eq = a.find('=')
 263       if eq > 0:
 264         a = a[0:eq]
+	      # 将所获取的'='后的部分存放到opt中，并从argv中删除已经解析的参数
 265     if not opt.has_option(a):
 266       del argv[i]
 267       continue
 268     i += 1
 269 
+```
+第255~268行：定义了_PruneOptions函数，用于提取单独的'--'选项前的参数，并将其存放到opt中，并删除已经解析了的参数
+
+```
 270 _user_agent = None
 271 
 272 def _UserAgent():
@@ -480,9 +503,36 @@
 480     handlers.append(urllib.request.HTTPSHandler(debuglevel=1))
 481   urllib.request.install_opener(urllib.request.build_opener(*handlers))
 482 
+
+      '''
+      对于repo init命令：'repo init -u https://android.googlesource.com/platform/manifest -b android-4.0.1_r1'
+      传入_Main的参数如下：
+        ['--repo-dir=/local/public/users/ygu/test/.repo', 
+            '--wrapper-version=1.23', 
+            '--wrapper-path=/home/rg935739/bin/repo', 
+            '--', 
+            'init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1', 
+            '--repo-url=https://gerrit.googlesource.com/git-repo', 
+            '--repo-branch=stable']
+
+      对于repo sync命令：'repo sync'
+      传入_Main的参数如下：
+        ['--repo-dir=/local/public/users/ygu/test/.repo', 
+            '--wrapper-version=1.23', 
+            '--wrapper-path=/home/rg935739/bin/repo', 
+            '--', 
+            'sync']
+      '''
 483 def _Main(argv):
 484   result = 0
 485 
+      #
+      # 构建optparse用于解析--wrapper-xxx部分的参数
+      # 包括：
+      #      --repo-dir
+      #      --wrapper-version
+      #      --wrapper-path
+      #
 486   opt = optparse.OptionParser(usage="repo wrapperinfo -- ...")
 487   opt.add_option("--repo-dir", dest="repodir",
 488                  help="path to .repo/")
@@ -490,7 +540,14 @@
 490                  help="version of the wrapper script")
 491   opt.add_option("--wrapper-path", dest="wrapper_path",
 492                  help="location of the wrapper script")
+      # 使用_PruneOptions进行参数分离，repo环境部分和其余部分
 493   _PruneOptions(argv, opt)
+
+      # (options, args) = parser.parse_args(args=None, values=None)
+      # options存储参数解析的结果, args存储选项解析完后剩余的参数
+      # 解析完成后：
+      # opt.manifest-url = 'https://android.googlesource.com/platform/manifest'
+      # opt.manifest-branch = 'android-4.0.1_r1'
 494   opt, argv = opt.parse_args(argv)
 495 
 496   _CheckWrapperVersion(opt.wrapper_version, opt.wrapper_path)
@@ -527,5 +584,27 @@
 527 
 528   sys.exit(result)
 529 
+      '''
+      对于repo init命令：'repo init -u https://android.googlesource.com/platform/manifest -b android-4.0.1_r1'
+      这里通过repo脚本转发最终获取的命令如下：
+        ['/local/public/users/ygu/test/.repo/repo/main.py', 
+            '--repo-dir=/local/public/users/ygu/test/.repo', 
+            '--wrapper-version=1.23', 
+            '--wrapper-path=/home/rg935739/bin/repo', 
+            '--', 
+            'init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1', 
+            '--repo-url=https://gerrit.googlesource.com/git-repo', 
+            '--repo-branch=stable']
+
+      对于repo sync命令：'repo sync'
+      这里通过repo脚本转发最终获取的命令如下：
+        ['/local/public/users/ygu/test/.repo/repo/main.py', 
+            '--repo-dir=/local/public/users/ygu/test/.repo', 
+            '--wrapper-version=1.23', 
+            '--wrapper-path=/home/rg935739/bin/repo', 
+            '--', 
+            'sync']
+      '''
 530 if __name__ == '__main__':
 531   _Main(sys.argv[1:])
+```
