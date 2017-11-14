@@ -115,17 +115,30 @@
  98     name = None
  99     glob = []
 100 
+        # 将第一个非'-'开始的参数作为命令的名称，如'init', 'sync'等
 101     for i in range(len(argv)):
 102       if not argv[i].startswith('-'):
 103         name = argv[i]
 104         if i > 0:
+              # 将命令名称如'init'或'sync'之前的选项存放到glob中
+              # 主要可能是前面定义的global_options选项
 105           glob = argv[:i]
 106         argv = argv[i + 1:]
 107         break
+
+        # 遍历完参数想都没有找到名称，则name为None
+        # 即没有指定具体的命令，此时默认为help命令
 108     if not name:
 109       glob = argv
 110       name = 'help'
 111       argv = []
+        # 使用global_options解析命令名称前的选项glob，主要有：
+        # ['--paginate': pager, 
+        #  '--no-pager': no_pager, 
+        #     '--color': color, 
+        #     '--trace': trace, 
+        #      '--time': time, 
+        #   '--version': show_version]
 112     gopts, _gargs = global_options.parse_args(glob)
 113 
 114     if gopts.trace:
@@ -137,16 +150,22 @@
 120         print('fatal: invalid usage of --version', file=sys.stderr)
 121         return 1
 122 
+        # 
 123     SetDefaultColoring(gopts.color)
 124 
+        # 检查解析到的命令名称在commands中是否存在，如'init', 'sync'等
+        # 并用cmd代指相应模块
 125     try:
 126       cmd = self.commands[name]
+        # 没有匹配到相应的命令名称
 127     except KeyError:
 128       print("repo: '%s' is not a repo command.  See 'repo help'." % name,
 129             file=sys.stderr)
 130       return 1
 131 
+        # 设置repodir, manifest和gitc_manifest
 132     cmd.repodir = self.repodir
+        # 解析repodir下的manifest文件
 133     cmd.manifest = XmlManifest(cmd.repodir)
 134     cmd.gitc_manifest = None
 135     gitc_client_name = gitc_utils.parse_clientdir(os.getcwd())
