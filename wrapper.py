@@ -18,7 +18,8 @@ from __future__ import print_function
 import imp
 import os
 
-
+# 返回'wrapper.py'同一目录下repo文件的完整路径名
+# 如：/opt/work/repo/.repo/repo
 def WrapperPath():
   return os.path.join(os.path.dirname(__file__), 'repo')
 
@@ -26,5 +27,6 @@ _wrapper_module = None
 def Wrapper():
   global _wrapper_module
   if not _wrapper_module:
+    # 将'/opt/work/repo/.repo/repo'的repo内容加载为wrapper进行调用
     _wrapper_module = imp.load_source('wrapper', WrapperPath())
   return _wrapper_module

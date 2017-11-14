@@ -100,12 +100,16 @@
  87                           help='display this version of repo')
  88 
  89 class _Repo(object):
+      # 使用repodir(即'.repo'目录)路径初始化_Repo
  90   def __init__(self, repodir):
  91     self.repodir = repodir
  92     self.commands = all_commands
  93     # add 'branch' as an alias for 'branches'
  94     all_commands['branch'] = all_commands['branches']
  95 
+      # 执行repo命令，argv参数如下：
+      # ['init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1']
+      # ['sync']
  96   def _Run(self, argv):
  97     result = 0
  98     name = None
@@ -229,6 +233,8 @@
 216   return os.path.dirname(__file__)
 217 
 218 
+    # 检查新下载的repo和原有脚本的版本，如果版本存在差异则进行提示
+    # ('1.23', '/home/ygu/bin/repo')
 219 def _CheckWrapperVersion(ver, repo_path):
 220   if not repo_path:
 221     repo_path = '~/bin/repo'
@@ -237,12 +243,18 @@
 224     print('no --wrapper-version argument', file=sys.stderr)
 225     sys.exit(1)
 226 
+      # 检查下载的repo库下repo文件的脚本
+      # 例如：文件'/opt/work/repo/.repo/repo'的VERSION
 227   exp = Wrapper().VERSION
+      # ver字符串悲剧了，哈哈，最后变成了 ver = (1, 23)
 228   ver = tuple(map(int, ver.split('.')))
 229   if len(ver) == 1:
 230     ver = (0, ver[0])
 231 
+      # 我去，前面把字符串ver拆开，这里又要把exp元组拼接在一起
+      # exp_str = '1.23'
 232   exp_str = '.'.join(map(str, exp))
+      # 比较新旧两个repo文件的版本，但搞不懂为啥还要比较ver < (0,4)
 233   if exp[0] > ver[0] or ver < (0, 4):
 234     print("""
 235 !!! A new repo command (%5s) is available.    !!!
@@ -252,6 +264,7 @@
 239 """ % (exp_str, WrapperPath(), repo_path), file=sys.stderr)
 240     sys.exit(1)
 241 
+      # 发现下载的是新版本repo，提示更新原有repo脚本
 242   if exp > ver:
 243     print("""
 244 ... A new repo command (%5s) is available.
@@ -260,6 +273,9 @@
 247     cp %s %s
 248 """ % (exp_str, WrapperPath(), repo_path), file=sys.stderr)
 249 
+    # 检查传入的'repo_dir'参数是否为空
+    # 正常情况下应该指示到'.repo'目录
+    # 如：'/opt/work/repo/.repo'
 250 def _CheckRepoDir(repo_dir):
 251   if not repo_dir:
 252     print('no --repo-dir argument', file=sys.stderr)
@@ -268,6 +284,7 @@
 ```
 
 ```
+    # 解析'--'选项前面的参数项
 255 def _PruneOptions(argv, opt):
 256   i = 0
 257   while i < len(argv):
@@ -280,7 +297,7 @@
 262       eq = a.find('=')
 263       if eq > 0:
 264         a = a[0:eq]
-	      # 将所获取的'='后的部分存放到opt中，并从argv中删除已经解析的参数
+        # 将所获取的'='后的部分存放到opt中，并从argv中删除已经解析的参数
 265     if not opt.has_option(a):
 266       del argv[i]
 267       continue
@@ -541,26 +558,38 @@
 491   opt.add_option("--wrapper-path", dest="wrapper_path",
 492                  help="location of the wrapper script")
       # 使用_PruneOptions进行参数分离，repo环境部分和其余部分
+      # 剔除'--'选项前面不属于opt的选项
 493   _PruneOptions(argv, opt)
 
       # (options, args) = parser.parse_args(args=None, values=None)
       # options存储参数解析的结果, args存储选项解析完后剩余的参数
       # 解析完成后：
-      # opt.manifest-url = 'https://android.googlesource.com/platform/manifest'
-      # opt.manifest-branch = 'android-4.0.1_r1'
+      # opt.repodir = '/local/public/users/ygu/test/.repo'
+      # opt.wrapper_version = '1.23'
+      # opt.wrapper_path = '/home/rg935739/bin/repo'
 494   opt, argv = opt.parse_args(argv)
+
+      # opt: {'wrapper_path': '/opt/work/repo/repo', 'repodir': '/opt/work/repo/.repo', 'wrapper_version': '1.23'}
+      # argv: ['init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1']
+      # 疑问: '--'选项哪里去了？
 495 
+      # 检查新旧repo脚本的版本，并提示更新
 496   _CheckWrapperVersion(opt.wrapper_version, opt.wrapper_path)
+      # 检查'.repo'目录是否设置，没有设置则为空，因为后续需要在该目录下工作，如下载manifests等
 497   _CheckRepoDir(opt.repodir)
 498 
 499   Version.wrapper_version = opt.wrapper_version
 500   Version.wrapper_path = opt.wrapper_path
 501 
+      # 使用repodir(即'.repo'目录路径)初始化_Repo类
 502   repo = _Repo(opt.repodir)
 503   try:
 504     try:
 505       init_ssh()
 506       init_http()
+          # 执行'--'选项后面的命令
+          # 如: ['init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1']
+          # 或: ['sync']
 507       result = repo._Run(argv) or 0
 508     finally:
 509       close_ssh()
