@@ -607,6 +607,21 @@ def _InitHttp():
   urllib.request.install_opener(urllib.request.build_opener(*handlers))
 
 
+"""
+构建并执行'git fetch'命令
+
+如 _Fetch(url, local, 'origin', quiet) 调用会转换为:
+  'git fetch origin +refs/heads/*:refs/remotes/origin/* refs/tags/*:refs/tags/*'
+
+为什么感觉url参数很重要，却没有被使用呢？
+因为url参数已经被写在.git/config文件中了，如：
+git-repo$ cat .git/config
+...
+[remote "origin"]
+        url = https://gerrit.googlesource.com/git-repo
+        fetch = +refs/heads/*:refs/remotes/origin/*
+...
+"""
 def _Fetch(url, local, src, quiet):
   if not quiet:
     _print('Get %s' % url, file=sys.stderr)
