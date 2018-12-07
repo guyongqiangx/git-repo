@@ -2,9 +2,11 @@
 
 # repo default configuration
 #
-# 通过 REPO_URL/REPO_REV 指定clone的地址和分支
-# 1. 尝试获取环境变量'REPO_URL'的值，如果没有设置，则使用google官方地址
-# 2. 默认下载stable分支
+"""
+通过 REPO_URL/REPO_REV 指定clone的地址和分支
+1. 尝试获取环境变量'REPO_URL'的值，如果没有设置，则使用google官方地址
+2. 默认下载stable分支
+"""
 import os
 REPO_URL = os.environ.get('REPO_URL', None)
 if not REPO_URL:
@@ -129,6 +131,23 @@ import stat
 import subprocess
 import sys
 
+"""
+urllib的兼容性处理
+
+检查python解释器版本，根据不同版本对urllib进行不同的处理，为不同版本解释器访问urllib库使用统一的接口。
+
+Python3中，urllib包含多个子模块：
+- urllib.request
+- urllib.error
+- urllib.parse
+- urllib.robotparser
+
+Python2中，分为urllib和urllib2，其功能不同。
+
+使用imp.new_module('urllib')生成一个名为'urllib'空白库，然后将urllib2作为其request和error成员的实现。
+因此这里生成的urllib同python2自带的urllib库是不一样的，只是名字相同而已。
+也可以理解为使用Python2现有库构造一个Python3使用方式一样的urllib库。
+"""
 if sys.version_info[0] == 3:
   import urllib.request
   import urllib.error
@@ -159,6 +178,49 @@ home_dot_repo = os.path.expanduser('~/.repoconfig')
 gpg_dir = os.path.join(home_dot_repo, 'gnupg')
 
 extra_args = []
+
+"""
+构建'repo init'命令的选项, 包括Logging, Manifest, Tool和Other四个部分。
+
+git-repo$ repo help init
+Usage: repo init -u url [options]
+
+Options:
+  -h, --help            show this help message and exit
+
+  Logging options:
+    -q, --quiet         be quiet
+
+  Manifest options:
+    -u URL, --manifest-url=URL
+                        manifest repository location
+    -b REVISION, --manifest-branch=REVISION
+                        manifest branch or revision
+    -m NAME.xml, --manifest-name=NAME.xml
+                        initial manifest file
+    --mirror            create a replica of the remote repositories rather
+                        than a client working directory
+    --reference=DIR     location of mirror directory
+    --depth=DEPTH       create a shallow clone with given depth; see git clone
+    --archive           checkout an archive instead of a git repository for
+                        each project. See git archive.
+    -g GROUP, --groups=GROUP
+                        restrict manifest projects to ones with specified
+                        group(s) [default|all|G1,G2,G3|G4,-G5,-G6]
+    -p PLATFORM, --platform=PLATFORM
+                        restrict manifest projects to ones with a specified
+                        platform group [auto|all|none|linux|darwin|...]
+    --no-clone-bundle   disable use of /clone.bundle on HTTP/HTTPS
+
+  repo Version options:
+    --repo-url=URL      repo repository location
+    --repo-branch=REVISION
+                        repo branch or revision
+    --no-repo-verify    do not verify repo source code
+
+  Other options:
+    --config-name       Always prompt for name/e-mail
+"""
 init_optparse = optparse.OptionParser(usage="repo init -u url [options]")
 
 # Logging
