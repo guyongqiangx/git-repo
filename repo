@@ -655,12 +655,47 @@ def _Fetch(url, local, src, quiet):
   if proc.wait() != 0:
     raise CloneFailure()
 
-
+"""
+下载url指定位置的clone.bundle数据并写入local下的.git/clone.bundle文件
+"""
 def _DownloadBundle(url, local, quiet):
   if not url.endswith('/'):
     url += '/'
   url += 'clone.bundle'
 
+  """
+  检查传入的url地址是否满足.git/config中url替换的规则，如果是，则使用insteadof规则进行相应处理。
+
+  以下是具体的解释：
+
+  执行: 'git config --get-regexp url.*.insteadof'
+  找出 .git/config 文件中所有 'url.*.insteadof'的节。
+
+  如以下操作:
+  $ git config url."http://localhost".insteadOf https://gerrit.googlesource.com
+  $ git config --add url."http://localhost".insteadOf http://github.com/guyongqiangx
+  $ cat .git/config
+  ...
+  [url "http://localhost"]
+          insteadOf = https://gerrit.googlesource.com
+          insteadOf = http://github.com/guyongqiangx
+  $ git config --get-regexp url.*.insteadof
+  url.http://localhost.insteadof https://gerrit.googlesource.com
+  url.http://localhost.insteadof http://github.com/guyongqiangx
+
+  执行match操作后：
+  line 1:
+  new_url --> http://localhost
+  old_url --> https://gerrit.googlesource.com
+
+  line 2:
+  new_url --> http://localhost
+  old_url --> http://github.com/guyongqiangx
+
+  然后对传入的url进行替换。
+  假设url='https://gerrit.googlesource.com/git-repo', 替换后url='http://localhost/git-repo'
+
+  """
   proc = subprocess.Popen(
       [GIT, 'config', '--get-regexp', 'url.*.insteadof'],
       cwd=local,
@@ -676,9 +711,17 @@ def _DownloadBundle(url, local, quiet):
   proc.stdout.close()
   proc.wait()
 
+  """
+  如果url不以'http:'或'https:'开头，则什么都不做，直接返回。
+  """
   if not url.startswith('http:') and not url.startswith('https:'):
     return False
 
+  """
+  构建本地clone.bundle文件的路径，如：/path/to/git-repo/.git/clone.bundle
+
+  然后将远程获取的clone.bundle文件数据写到本地。
+  """
   dest = open(os.path.join(local, '.git', 'clone.bundle'), 'w+b')
   try:
     try:
