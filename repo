@@ -613,14 +613,26 @@ def _InitHttp():
 如 _Fetch(url, local, 'origin', quiet) 调用会转换为:
   'git fetch origin +refs/heads/*:refs/remotes/origin/* refs/tags/*:refs/tags/*'
 
-为什么感觉url参数很重要，却没有被使用呢？
-因为url参数已经被写在.git/config文件中了，如：
+- url
+为什么感觉url参数很重要，却没有被使用呢？ 因为url参数已经被写在.git/config文件中了，如：
 git-repo$ cat .git/config
 ...
 [remote "origin"]
         url = https://gerrit.googlesource.com/git-repo
         fetch = +refs/heads/*:refs/remotes/origin/*
 ...
+
+- local
+local参数被传递给cwd变量，用于指定执行'git fetch'命令时所在的路径。
+
+- src
+src参数用于指定'git fetch'的源:
+  - 如果是remote源，例如通常的'origin'，.git/config文件中对应remote有一个相应的url
+  - 如果是bundle源，为bundle文件的路径
+换一种说法，'git fetch'通过src参数知道从哪里拿数据。
+
+- quiet
+根据quiet的值，决定'git fetch'操作的error log送往管道还是标准的错误输出设备。
 """
 def _Fetch(url, local, src, quiet):
   if not quiet:
