@@ -865,7 +865,17 @@ def _SetDefaultsTo(gitdir):
     sys.exit(1)
 
 
+"""
+如:'repo init -u https://android.googlesource.com/platform/manifest -b android-4.0.1_r1'
+则: orig_args = ['repo', 'init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1']
+"""
 def main(orig_args):
+  """
+  解析列表参数orig_args，对于'init'命令，解析返回的结果为：
+  - cmd: 'init'
+  - opt.help = False
+  - arg: ['-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1']
+  """
   cmd, opt, args = _ParseArguments(orig_args)
 
   repo_main, rel_repo_dir = None, None
@@ -905,6 +915,31 @@ def main(orig_args):
   if my_main:
     repo_main = my_main
 
+  """
+  命令:'repo init -u https://android.googlesource.com/platform/manifest -b android-4.0.1_r1'
+  最终构建的me如下：
+    ['/usr/bin/python',
+        '/path/to/test/.repo/repo/main.py',
+        '--repo-dir=/path/to/test/.repo',
+        '--wrapper-version=1.23',
+        '--wrapper-path=/home/rg935739/bin/repo',
+        '--',
+        'init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1',
+        '--repo-url=https://gerrit.googlesource.com/git-repo',
+        '--repo-branch=stable']
+
+  命令:'repo sync'
+  最终构建me如下：
+    ['/usr/bin/python',
+        '/path/to/test/.repo/repo/main.py',
+        '--repo-dir=/path/to/test/.repo',
+        '--wrapper-version=1.23',
+        '--wrapper-path=/home/rg935739/bin/repo',
+        '--',
+        'sync']
+
+  所有命令都转到repo_main.py去执行。
+  """
   ver_str = '.'.join(map(str, VERSION))
   me = [sys.executable, repo_main,
         '--repo-dir=%s' % rel_repo_dir,
@@ -921,9 +956,21 @@ def main(orig_args):
     sys.exit(148)
 
 
+"""
+repo命令入口，以android官方的'init'命令为例:
+  'repo init -u https://android.googlesource.com/platform/manifest -b android-4.0.1_r1'
+"""
 if __name__ == '__main__':
+
+  """
+  提示仅支持python2版本
+  """
   if ver[0] == 3:
     _print('warning: Python 3 support is currently experimental. YMMV.\n'
            'Please use Python 2.6 - 2.7 instead.',
            file=sys.stderr)
+  """
+  如:'repo init -u https://android.googlesource.com/platform/manifest -b android-4.0.1_r1'
+  则: argv = ['repo', 'init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1']
+  """
   main(sys.argv[1:])
