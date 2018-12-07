@@ -2,6 +2,9 @@
 
 # repo default configuration
 #
+# 通过 REPO_URL/REPO_REV 指定clone的地址和分支
+# 1. 尝试获取环境变量'REPO_URL'的值，如果没有设置，则使用google官方地址
+# 2. 默认下载stable分支
 import os
 REPO_URL = os.environ.get('REPO_URL', None)
 if not REPO_URL:
@@ -290,6 +293,25 @@ def _Init(args, gitc_init=False):
     init_optparse.print_usage()
     sys.exit(1)
 
+  """
+  检查命令行传递进来的repo-url和repo-branch选项：
+  '--repo-url'    --> opt.repo_url
+  '--repo-branch' --> opt.repo_branch
+  并添加如下参数到extra_args:
+  '--repo-url=https://gerrit.googlesource.com/git-repo --repo-branch=stable'
+
+  1. 如果没有指定repo-url, 则使用系统默认的REPO_URL设置。
+  2. 如果没有指定repo-branch, 则使用系统默认的REPO_REV设置
+
+  repo_url的设置优先级如下：
+    1. '--repo-url'选项
+    2. 环境变量'REPO_URL'
+    3. google官方地址: ''https://gerrit.googlesource.com/git-repo'
+
+  repo_branch的设置优先级如下：
+    1. '--repo-branch'选项
+    2. 'stable'分支
+  """
   url = opt.repo_url
   if not url:
     url = REPO_URL
@@ -300,6 +322,27 @@ def _Init(args, gitc_init=False):
     branch = REPO_REV
     extra_args.append('--repo-branch=%s' % branch)
 
+  """
+  检查branch对应的分支参数:
+  1. 如果以'refs/heads/'开始, 则取尾部的分支名称
+  2. 如果以'refs/'开始，则说明是无效分支
+
+  如果当前git-repo下有一个stable分支，则引用如下：
+
+  git-repo$ tree .git/refs/
+  .git/refs/
+  |-- heads
+  |   |-- master
+  |   `-- stable
+  |-- remotes
+  |   `-- origin
+  |       `-- HEAD
+  `-- tags
+
+  4 directories, 3 files
+
+  可见这里的'stable'分支全名为'refs/heads/stable'，且没有名称以'refs/'开始的分支，如'refs/stable'。
+  """
   if branch.startswith('refs/heads/'):
     branch = branch[len('refs/heads/'):]
   if branch.startswith('refs/'):
