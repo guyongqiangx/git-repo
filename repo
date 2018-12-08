@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 # repo default configuration
 #
@@ -345,6 +346,10 @@ class CloneFailure(Exception):
   """
 
 
+"""
+调用: _Init(args=['-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1'],
+          gitc_init=(cmd == 'gitc-init'))
+"""
 def _Init(args, gitc_init=False):
   """Installs repo by cloning it over the network.
   """
@@ -442,6 +447,14 @@ def _Init(args, gitc_init=False):
       #
       sys.exit(1)
 
+  """
+  余下代码执行以下操作:
+  1. 检查git版本是否大于1.7.2
+  2. 设置GnuPG验证环境
+  3. 调用_Clone()将url指定的远程repo库复制到本地
+  4. 只用GnuPG的key对制定的branch进行校验
+  5. 检出branch指定的分支，默认检出'stable'分支
+  """
   _CheckGitVersion()
   try:
     if NeedSetupGnuPG():
@@ -450,6 +463,12 @@ def _Init(args, gitc_init=False):
       can_verify = True
 
     dst = os.path.abspath(os.path.join(repodir, S_repo))
+    """
+    复制远程的repo库到本地，如：
+    _Clone(url='https://gerrit.googlesource.com/git-repo', local='/path/to/test/.repo/repo', quiet=False, clone_bundle=True)
+
+    将url('https://gerrit.googlesource.com/git-repo')指定的repo复制到本地'.repo/repo'目录。
+    """
     _Clone(url, dst, opt.quiet, not opt.no_clone_bundle)
 
     if can_verify and not opt.no_repo_verify:
@@ -457,6 +476,11 @@ def _Init(args, gitc_init=False):
     else:
       rev = 'refs/remotes/origin/%s^0' % branch
 
+    """
+    根据branch设置检出分支。
+
+    branch由传入的'--repo-branch'选项设置, 没有时默认为REPO_REV='stable'，所以默认会检出repo库的'stable'分支。
+    """
     _Checkout(dst, branch, rev, opt.quiet)
   except CloneFailure:
     if opt.quiet:
@@ -903,6 +927,14 @@ def _Verify(cwd, branch, quiet):
 def _Checkout(cwd, branch, rev, quiet):
   """Checkout an upstream branch into the repository and track it.
   """
+  """
+  整个_Checkout()操作依次执行以下操作：
+  1. 'git update-ref refs/heads/default rev'
+  2. 'git config branch.default.remote origin'
+  3. 'git config branch.default.merge refs/heads/branch'
+  4. 'git symbolic-ref HEAD refs/heads/default'
+  5. 'git read-tree --reset -u -v HEAD'
+  """
   cmd = [GIT, 'update-ref', 'refs/heads/default', rev]
   if subprocess.Popen(cmd, cwd=cwd).wait() != 0:
     raise CloneFailure()
@@ -960,6 +992,17 @@ class _Options(object):
   help = False
 
 
+"""
+解析args参数的选项
+
+命令参数主要有两部分组成, 如:
+args = ['init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1']
+则:
+cmd = 'init'
+arg = ['-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1']
+
+如果args中包含'-h'或'--help'项, 则opt.help=True
+"""
 def _ParseArguments(args):
   cmd = None
   opt = _Options()
@@ -969,7 +1012,9 @@ def _ParseArguments(args):
     a = args[i]
     if a == '-h' or a == '--help':
       opt.help = True
-
+    """
+    cmd为args中第一个不以'-'开头的项，其余项都作为arg
+    """
     elif not a.startswith('-'):
       cmd = a
       arg = args[i + 1:]
@@ -1117,11 +1162,35 @@ def _NoCommands(cmd):
   sys.exit(1)
 
 
+"""
+检查wrapper_path对应的路径下是否存在一个完整的repo库
+
+如果是，就返回repo库下'main.py'文件和'.git'目录的路径，否则返回空。
+"""
 def _RunSelf(wrapper_path):
+  """
+  有wrapper_path有两种可能的情况，单独的repo脚本或完整的repo库。
+
+  1. 单独的repo脚本，如: wrapper_path = /home/rg935739/bin/repo, 则:
+  my_dir  = /home/rg935739/bin
+  my_main = /home/rg935739/bin/main.py
+  my_git  = /home/rg935739/bin/.git
+
+  2. 完整的repo库，如: wrapper_path = /path/to/test/.repo/repo/repo, 则:
+  my_dir  = /path/to/test/.repo/repo
+  my_main = /path/to/test/.repo/repo/main.py
+  my_git  = /path/to/test/.repo/repo/.git
+  """
   my_dir = os.path.dirname(wrapper_path)
   my_main = os.path.join(my_dir, 'main.py')
   my_git = os.path.join(my_dir, '.git')
 
+  """
+  检查是否是一个完整的repo库
+
+  如果wrapper_path对应路径下'main.py', '.git'和其它的'git_config.py', 'project.py'以及'subcmds'都存在，
+  说明当前是一个完整的repo库，而不是一个单独的'repo'脚本。
+  """
   if os.path.isfile(my_main) and os.path.isdir(my_git):
     for name in ['git_config.py',
                  'project.py',
@@ -1136,6 +1205,9 @@ def _SetDefaultsTo(gitdir):
   global REPO_URL
   global REPO_REV
 
+  """
+  执行：'git --git-dir=/path/to/test/.repo/repo/.git symbolic-ref HEAD'
+  """
   REPO_URL = gitdir
   proc = subprocess.Popen([GIT,
                            '--git-dir=%s' % gitdir,
@@ -1159,14 +1231,19 @@ def _SetDefaultsTo(gitdir):
 
 如:'repo init -u https://android.googlesource.com/platform/manifest -b android-4.0.1_r1'
 '__main__'入口调用: main(['init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1'])
-这里: orig_args = ['init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1']
 """
 def main(orig_args):
   """
-  解析列表参数orig_args，对于'init'命令，解析返回的结果为：
+  由_ParseArguments(args)可知，任何一个args都由两部分组成，即前面的cmd部分和cmd后面的arg部分。
+  如果参数args中包含'-h'或'-help'项，则返回结果中opt.help = True
+
+  解析列表参数orig_args，对于上面的'init'命令:
+  orig_args = ['init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1']
+
+  解析返回的结果为：
   - cmd: 'init'
-  - opt.help = False
   - arg: ['-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1']
+  - opt.help = False
   """
   cmd, opt, args = _ParseArguments(orig_args)
 
@@ -1175,6 +1252,19 @@ def main(orig_args):
   if cmd != 'gitc-init':
     repo_main, rel_repo_dir = _FindRepo()
 
+  """
+  名称为'repo'的脚本至少在两个地方存在：
+  1. 用户下载的repo脚本，通常位于主目录bin文件夹下，如: /home/rg935739/bin/repo
+  2. 'repo init'初始化以后下载的repo库中的repo脚本: '.repo/repo/repo'
+
+  使用os.path.abspath(__file__)来获取当前执行脚本的绝对路径。
+
+  'repo COMMAND'命令通常引用的是用户主目录bin文件夹下的repo。
+
+  通过_RunSelf(wrapper_path)调用确认当前执行的是单独的repo脚本还是完整repo库下的repo脚本。
+  - 如果是完整的repo库，则my_main和my_git分别返回repo库下'main.py'文件和'.git'目录的路径，以备后续使用。
+  - 如果是单独的repo脚本，则my_main和my_git返回值都是None。
+  """
   wrapper_path = os.path.abspath(__file__)
   my_main, my_git = _RunSelf(wrapper_path)
 
@@ -1185,6 +1275,15 @@ def main(orig_args):
            'command from the corresponding client under /gitc/',
            file=sys.stderr)
     sys.exit(1)
+
+  """
+  如果是单独repo脚本的情况，有几种操作:
+  - 参数中带有'-h'或'-help'，显示repo脚本简单的帮助信息
+  - 参数中带有'init'或'gitc-init'命令，调用_Init()下载repo库到本地
+    例如前面的'repo init'命令，这里的调用为:
+    _Init(args=['-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1'], ...)
+  - 参数中不带命令，或没有找到相应命令，显示相应的提示信息
+  """
   if not repo_main:
     if opt.help:
       _Usage()
@@ -1196,18 +1295,37 @@ def main(orig_args):
       if my_git:
         _SetDefaultsTo(my_git)
       try:
+        """
+        调用: _Init(args=['-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1'], ...)
+        """
         _Init(args, gitc_init=(cmd == 'gitc-init'))
       except CloneFailure:
+        """
+        下载repo库失败时，会删除整个'.repo'目录
+        """
         shutil.rmtree(os.path.join(repodir, S_repo), ignore_errors=True)
         sys.exit(1)
+      """
+      下载repo成功后:
+      repo_main    = '.repo/mani.py'文件路径
+      rel_repo_dir = '.repo'目录路径
+      """
       repo_main, rel_repo_dir = _FindRepo()
     else:
       _NoCommands(cmd)
 
+  """
+  repo_main是在下载repo库后设置的。
+  在已经存在repo的情况下，不会再次下载repo库，也就不会设置repo_main，所以这里需要用my_main设置repo_main。
+  """
   if my_main:
     repo_main = my_main
 
   """
+  到这里就已经准备好repo库了，意味着所有的repo命令都可转到’.repo/repo/main.py'脚本运行了。
+
+  这里将repo命令打包转发到'.repo/repo/main.py'脚本去执行，例如：
+
   命令:'repo init -u https://android.googlesource.com/platform/manifest -b android-4.0.1_r1'
   最终构建的me如下：
     ['/usr/bin/python',
@@ -1230,7 +1348,7 @@ def main(orig_args):
         '--',
         'sync']
 
-  所有命令都转到repo_main.py去执行。
+  所以剩下的事情都交给'.repo/repo/main.py'脚本了。
   """
   ver_str = '.'.join(map(str, VERSION))
   me = [sys.executable, repo_main,
@@ -1268,6 +1386,4 @@ if __name__ == '__main__':
   最后main函数调用为:
   main(['init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1'])
   """
-  _print(sys.argv[1:])
-  sys.exit(1)
   main(sys.argv[1:])
