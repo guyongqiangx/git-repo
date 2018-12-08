@@ -608,10 +608,13 @@ def _InitHttp():
 
 
 """
-构建并执行'git fetch'命令
+构建并执行'git fetch'命令获取src指定的远程库数据到本地local目录下。
 
-如 _Fetch(url, local, 'origin', quiet) 调用会转换为:
+对于url指定的远程库, _Fetch(url, local, 'origin', quiet) 执行命令:
   'git fetch origin +refs/heads/*:refs/remotes/origin/* refs/tags/*:refs/tags/*'
+
+对于clone.bundle的本地文件, _Fetch(url, local, '/path/to/git-repo/.git/clone.bundle', quiet) 执行命令:
+  'git fetch /path/to/git-repo/.git/clone.bundle +refs/heads/*:refs/remotes/origin/* refs/tags/*:refs/tags/*'
 
 - url
 为什么感觉url参数很重要，却没有被使用呢？ 因为url参数已经被写在.git/config文件中了，如：
