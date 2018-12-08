@@ -713,6 +713,7 @@ def _DownloadBundle(url, local, quiet):
 
   """
   如果url不以'http:'或'https:'开头，则什么都不做，直接返回。
+  例如，以'file://'开头，说明在本地，不需要用urllib.request下载。
   """
   if not url.startswith('http:') and not url.startswith('https:'):
     return False
@@ -749,15 +750,34 @@ def _DownloadBundle(url, local, quiet):
   finally:
     dest.close()
 
+"""
+导入本地路径下的clone.bundle文件，如：/path/to/git-repo, 完成后删除bundle文件
 
+则此时尝试导入/path/to/git-repo/.git/clone.bundle并删除:
+'git fetch /path/to/git-repo/.git/clone.bundle +refs/heads/*:refs/remotes/origin/* refs/tags/*:refs/tags/*'
+"""
 def _ImportBundle(local):
   path = os.path.join(local, '.git', 'clone.bundle')
   try:
+    """
+    假如 local = '/path/to/git-repo', 则:
+    _Fetch('/path/to/git-repo', '/path/to/git-repo', '/path/to/git-repo/.git/clone.bundle', True)
+
+    _Fetch函数中进一步调用的'git fetch'命令为:
+    'git fetch /path/to/git-repo/.git/clone.bundle +refs/heads/*:refs/remotes/origin/* refs/tags/*:refs/tags/*'
+    """
     _Fetch(local, local, path, True)
   finally:
     os.remove(path)
 
+"""
+复制由url指定的远程git库到本地local指定的目录下。
 
+如果支持bundle方式，则会先下载并导入clone.bundle文件，在此基础上执行'git fetch'操作，这样可以减少网络数据传输量。
+试想，一次传输一个大文件的效率和将大文件分为几百上千片再进行传输的效率，哪个高呢？
+
+不使用bundle的情况下，直接执行'git fetch'下载远端git库。
+"""
 def _Clone(url, local, quiet, clone_bundle):
   """Clones a git repository to a new subdirectory of repodir
   """
@@ -768,6 +788,9 @@ def _Clone(url, local, quiet, clone_bundle):
            file=sys.stderr)
     raise CloneFailure()
 
+  """
+  在local目录下执行: 'git init --quiet'
+  """
   cmd = [GIT, 'init', '--quiet']
   try:
     proc = subprocess.Popen(cmd, cwd=local)
@@ -783,11 +806,37 @@ def _Clone(url, local, quiet, clone_bundle):
     _print('fatal: could not create %s' % local, file=sys.stderr)
     raise CloneFailure()
 
+  """
+  执行以下操作:
+  1. 初始化http连接, 可能还需要输入相应的用户名和密码
+
+  2. 设置远程remote的origin源的url地址, 例如:
+     在local目录下执行: 'git config remote.origin.url https://gerrit.googlesource.com/git-repo'
+
+  3. 设置远程remote的origin源与本地分支在fetch操作时的对应关系
+     在local目录下执行: 'git config remote.origin.fetch +refs/heads/*:refs/remotes/origin/*'
+
+  操作完成后, '.git/config'中会添加如下内容:
+  $ cat .git/config
+  ...
+  [remote "origin"]
+    url = https://gerrit.googlesource.com/git-repo
+    fetch = +refs/heads/*:refs/remotes/origin/*
+  ...
+  """
   _InitHttp()
   _SetConfig(local, 'remote.origin.url', url)
   _SetConfig(local,
              'remote.origin.fetch',
              '+refs/heads/*:refs/remotes/origin/*')
+
+  """
+  如果指示了clone bundle方式，则尝试下载远端的clone.bundle到本地，然后导入下载的clone.bundle文件。
+
+  对远程remote的orgin源执行'git fetch'操作。
+
+  这里要注意的是，即使是clone bundle的方式，在导入clone.bundle文件后，依然执行'git fetch'，这样确保了本地是最新的代码。
+  """
   if clone_bundle and _DownloadBundle(url, local, quiet):
     _ImportBundle(local)
   _Fetch(url, local, 'origin', quiet)
