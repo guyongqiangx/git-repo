@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2008 The Android Open Source Project
 #
@@ -480,9 +481,32 @@ def init_http():
     handlers.append(urllib.request.HTTPSHandler(debuglevel=1))
   urllib.request.install_opener(urllib.request.build_opener(*handlers))
 
+
+"""
+  命令:'repo init -u https://android.googlesource.com/platform/manifest -b android-4.0.1_r1'
+  _Main(argv)接收的参数argv如下：
+    ['--repo-dir=/path/to/test/.repo',
+     '--wrapper-version=1.23',
+     '--wrapper-path=/home/rg935739/bin/repo',
+     '--',
+     'init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1',
+     '--repo-url=https://gerrit.googlesource.com/git-repo',
+     '--repo-branch=stable']
+
+  命令:'repo sync'
+  _Main(argv)接收的参数argv如下：
+    ['--repo-dir=/path/to/test/.repo',
+     '--wrapper-version=1.23',
+     '--wrapper-path=/home/rg935739/bin/repo',
+     '--',
+     'sync']
+"""
 def _Main(argv):
   result = 0
 
+  """
+  移除'--repo-dir', '--wrapper-version', '--wrapper-path'三个不再使用的参数。
+  """
   opt = optparse.OptionParser(usage="repo wrapperinfo -- ...")
   opt.add_option("--repo-dir", dest="repodir",
                  help="path to .repo/")
@@ -527,5 +551,27 @@ def _Main(argv):
 
   sys.exit(result)
 
+
+"""
+  命令:'repo init -u https://android.googlesource.com/platform/manifest -b android-4.0.1_r1'
+  main.py接收到的参数sys.argv[]如下：
+    ['/path/to/test/.repo/repo/main.py',
+        '--repo-dir=/path/to/test/.repo',
+        '--wrapper-version=1.23',
+        '--wrapper-path=/home/rg935739/bin/repo',
+        '--',
+        'init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1',
+        '--repo-url=https://gerrit.googlesource.com/git-repo',
+        '--repo-branch=stable']
+
+  命令:'repo sync'
+  main.py接收到的参数sys.argv[]如下：
+    ['/path/to/test/.repo/repo/main.py',
+        '--repo-dir=/path/to/test/.repo',
+        '--wrapper-version=1.23',
+        '--wrapper-path=/home/rg935739/bin/repo',
+        '--',
+        'sync']
+"""
 if __name__ == '__main__':
   _Main(sys.argv[1:])
