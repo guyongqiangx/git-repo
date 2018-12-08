@@ -961,6 +961,22 @@ def _ParseArguments(args):
   return cmd, opt, arg
 
 
+"""
+显示以下信息:
+
+'''
+usage: repo COMMAND [ARGS]
+
+repo is not yet installed.  Use "repo init" to install it here.
+
+The most commonly used repo commands are:
+
+  init      Install repo in the current working directory
+  help      Display detailed help on a command
+
+For access to the full online help, install repo ("repo init").
+'''
+"""
 def _Usage():
   gitc_usage = ""
   if get_gitc_manifest_dir():
@@ -982,6 +998,64 @@ For access to the full online help, install repo ("repo init").
   sys.exit(1)
 
 
+"""
+显示init或gitc-init命令的帮助信息
+
+$ repo init -h
+Usage: repo init -u url [options]
+
+
+Options:
+  -h, --help            show this help message and exit
+
+  Logging options:
+    -q, --quiet         be quiet
+
+  Manifest options:
+    -u URL, --manifest-url=URL
+                        manifest repository location
+    -b REVISION, --manifest-branch=REVISION
+                        manifest branch or revision
+    -m NAME.xml, --manifest-name=NAME.xml
+                        initial manifest file
+    --mirror            create a replica of the remote repositories rather
+                        than a client working directory
+    --reference=DIR     location of mirror directory
+    --depth=DEPTH       create a shallow clone with given depth; see git clone
+    --archive           checkout an archive instead of a git repository for
+                        each project. See git archive.
+    -g GROUP, --groups=GROUP
+                        restrict manifest projects to ones with specified
+                        group(s) [default|all|G1,G2,G3|G4,-G5,-G6]
+    -p PLATFORM, --platform=PLATFORM
+                        restrict manifest projects to ones with a specified
+                        platform group [auto|all|none|linux|darwin|...]
+    --no-clone-bundle   disable use of /clone.bundle on HTTP/HTTPS
+
+  repo Version options:
+    --repo-url=URL      repo repository location
+    --repo-branch=REVISION
+                        repo branch or revision
+    --no-repo-verify    do not verify repo source code
+
+  Other options:
+    --config-name       Always prompt for name/e-mail
+
+$ repo gitc-init -h
+Usage: repo gitc-init -u url -c client [options]
+
+Options:
+  -h, --help            show this help message and exit
+
+  ...gitc-init的这部分帮助信息与init的帮助信息一样...
+
+  GITC options:
+    -f MANIFEST_FILE, --manifest-file=MANIFEST_FILE
+                        Optional manifest file to use for this GITC client.
+    -c GITC_CLIENT, --gitc-client=GITC_CLIENT
+                        The name of the gitc_client instance to create or
+                        modify.
+"""
 def _Help(args):
   if args:
     if args[0] == 'init':
@@ -1000,12 +1074,27 @@ def _Help(args):
   sys.exit(1)
 
 
+"""
+显示repo库没有安装的错误信息
+
+如下:
+$ repo
+error: repo is not installed.  Use "repo init" to install it here.
+"""
 def _NotInstalled():
   _print('error: repo is not installed.  Use "repo init" to install it here.',
          file=sys.stderr)
   sys.exit(1)
 
 
+"""
+显示找不到命令的错误信息
+
+如下:
+$ repo sync
+error: command 'sync' requires repo to be installed first.
+         Use "repo init" to install it here.
+"""
 def _NoCommands(cmd):
   _print("""error: command '%s' requires repo to be installed first.
          Use "repo init" to install it here.""" % cmd, file=sys.stderr)
