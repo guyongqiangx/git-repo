@@ -922,6 +922,14 @@ def _Checkout(cwd, branch, rev, quiet):
     raise CloneFailure()
 
 
+"""
+查找repo的安装路径, 返回'.repo/mani.py'文件和'.repo'目录的完整路径
+
+以'/public/test'目录为例，返回如下内容:
+  ('/public/test/.repo/repo/main.py', '/public/test/.repo')
+
+操作上从当前目录开始逐级向外层查找'.repo/main.py'文件，直到根'/'目录为止。
+"""
 def _FindRepo():
   """Look for a repo installation, starting at the current directory.
   """
@@ -932,11 +940,19 @@ def _FindRepo():
   while curdir != '/' \
           and curdir != olddir \
           and not repo:
+    """
+    repo = curdir/.repo/repo/main.py
+    向外逐级检查repo指定文件是否存在
+    """
     repo = os.path.join(curdir, repodir, REPO_MAIN)
     if not os.path.isfile(repo):
       repo = None
       olddir = curdir
       curdir = os.path.dirname(curdir)
+  """
+  返回'.repo/main.py'文件和'.repo'目录的完整路径, 如:
+  ('/public/test/.repo/repo/main.py', '/public/test/.repo')
+  """
   return (repo, os.path.join(curdir, repodir))
 
 
@@ -962,7 +978,7 @@ def _ParseArguments(args):
 
 
 """
-显示以下信息:
+显示没有安装repo时简单的帮助信息
 
 '''
 usage: repo COMMAND [ARGS]
@@ -1139,8 +1155,11 @@ def _SetDefaultsTo(gitdir):
 
 
 """
+脚本的main函数，执行'repo'脚本时会通过'__main__'入口转到main函数
+
 如:'repo init -u https://android.googlesource.com/platform/manifest -b android-4.0.1_r1'
-则: orig_args = ['repo', 'init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1']
+'__main__'入口调用: main(['init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1'])
+这里: orig_args = ['init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1']
 """
 def main(orig_args):
   """
@@ -1245,5 +1264,10 @@ if __name__ == '__main__':
   """
   如:'repo init -u https://android.googlesource.com/platform/manifest -b android-4.0.1_r1'
   则: argv = ['repo', 'init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1']
+
+  最后main函数调用为:
+  main(['init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1'])
   """
+  _print(sys.argv[1:])
+  sys.exit(1)
   main(sys.argv[1:])
