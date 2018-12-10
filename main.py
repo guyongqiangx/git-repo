@@ -65,6 +65,21 @@ if not is_python3():
   input = raw_input
   # pylint:enable=W0622
 
+"""
+只有repo库存在的情况下才会执行到这里，因为main.py就是repo库的一部分。
+repo库存在时的帮助信息：
+$ repo -h
+Usage: repo [-p|--paginate|--no-pager] COMMAND [ARGS]
+
+Options:
+  -h, --help      show this help message and exit
+  -p, --paginate  display command output in the pager
+  --no-pager      disable the pager
+  --color=COLOR   control color usage: auto, always, never
+  --trace         trace git command execution
+  --time          time repo command execution
+  --version       display this version of repo
+"""
 global_options = optparse.OptionParser(
                  usage="repo [-p|--paginate|--no-pager] COMMAND [ARGS]"
                  )
@@ -217,6 +232,12 @@ def _MyRepoPath():
   return os.path.dirname(__file__)
 
 
+"""
+比较单独执行的repo工具脚本与repo库中'.repo/repo/repo'脚本的版本，
+如果二者版本不一致，提示相应的升级信息。
+
+_CheckWrapperVersion(ver='1.23', repo_path='/home/rg935739/bin/repo')
+"""
 def _CheckWrapperVersion(ver, repo_path):
   if not repo_path:
     repo_path = '~/bin/repo'
@@ -225,6 +246,12 @@ def _CheckWrapperVersion(ver, repo_path):
     print('no --wrapper-version argument', file=sys.stderr)
     sys.exit(1)
 
+  """
+  Wrapper由'.repo/repo/repo'脚本通过'img.load_source()'生成。
+
+  以下比较repo库中'.repo/repo/repo'脚本的版本和传递进来的ver。
+  并根据具体的版本情况显示提示信息，对repo_path指定的脚本进行升级。
+  """
   exp = Wrapper().VERSION
   ver = tuple(map(int, ver.split('.')))
   if len(ver) == 1:
@@ -483,6 +510,8 @@ def init_http():
 
 
 """
+main.py脚本入口'__main__'调用这里的'_Main(argv)'
+
   命令:'repo init -u https://android.googlesource.com/platform/manifest -b android-4.0.1_r1'
   _Main(argv)接收的参数argv如下：
     ['--repo-dir=/path/to/test/.repo',
@@ -517,6 +546,12 @@ def _Main(argv):
   _PruneOptions(argv, opt)
   opt, argv = opt.parse_args(argv)
 
+  """
+  检查单独的repo脚本和repo库中的repo脚本版本是否一致
+  如果不一致，显示更新repo脚本的提示信息
+
+  '--repo-dir'需要被设置为'.repo'目录的路径，检查是否已经设置。
+  """
   _CheckWrapperVersion(opt.wrapper_version, opt.wrapper_path)
   _CheckRepoDir(opt.repodir)
 
@@ -553,6 +588,8 @@ def _Main(argv):
 
 
 """
+main.py脚本入口
+
   命令:'repo init -u https://android.googlesource.com/platform/manifest -b android-4.0.1_r1'
   main.py接收到的参数sys.argv[]如下：
     ['/path/to/test/.repo/repo/main.py',
