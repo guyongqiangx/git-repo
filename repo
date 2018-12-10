@@ -955,7 +955,7 @@ def _Checkout(cwd, branch, rev, quiet):
 
 
 """
-查找repo的安装路径, 返回'.repo/mani.py'文件和'.repo'目录的完整路径
+查找repo的安装路径, 返回'.repo/repo/main.py'文件和'.repo'目录的完整路径
 
 以'/public/test'目录为例，返回如下内容:
   ('/public/test/.repo/repo/main.py', '/public/test/.repo')
@@ -982,7 +982,7 @@ def _FindRepo():
       olddir = curdir
       curdir = os.path.dirname(curdir)
   """
-  返回'.repo/main.py'文件和'.repo'目录的完整路径, 如:
+  返回'.repo/repo/main.py'文件和'.repo'目录的完整路径, 如:
   ('/public/test/.repo/repo/main.py', '/public/test/.repo')
   """
   return (repo, os.path.join(curdir, repodir))
@@ -1245,6 +1245,11 @@ def main(orig_args):
   """
   cmd, opt, args = _ParseArguments(orig_args)
 
+  """
+  第一次查找.repo目录，如果存在，则：
+  repo_main    = '.repo/repo/main.py'文件路径
+  rel_repo_dir = '.repo'目录路径
+  """
   repo_main, rel_repo_dir = None, None
   # Don't use the local repo copy, make sure to switch to the gitc client first.
   if cmd != 'gitc-init':
@@ -1281,6 +1286,14 @@ def main(orig_args):
     例如前面的'repo init'命令，这里的调用为:
     _Init(args=['-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1'], ...)
   - 参数中不带命令，或没有找到相应命令，显示相应的提示信息
+
+  如果是完整的repo库的情况，不会再走以下if语句去下载初始化repo库。
+
+  这里刚好也处理了'-h'/'-help'(即opt.help=True)和'help'命令，所以有repo库和没有repo库，以下命令的输出是不一样的：
+  $ repo -h
+  $ repo -help
+  $ repo help
+  因为没有repo库的情况下，这些命令会在这里处理；在repo库存在的情况下，这些命令会被转到'.repo/repo/main.py'中处理。
   """
   if not repo_main:
     if opt.help:
@@ -1304,8 +1317,8 @@ def main(orig_args):
         shutil.rmtree(os.path.join(repodir, S_repo), ignore_errors=True)
         sys.exit(1)
       """
-      下载repo成功后:
-      repo_main    = '.repo/mani.py'文件路径
+      下载repo成功后, 第二次查找.repo目录，更新repo_main和rel_repo_dir:
+      repo_main    = '.repo/repo/main.py'文件路径
       rel_repo_dir = '.repo'目录路径
       """
       repo_main, rel_repo_dir = _FindRepo()
@@ -1313,8 +1326,9 @@ def main(orig_args):
       _NoCommands(cmd)
 
   """
-  repo_main是在下载repo库后设置的。
-  在已经存在repo的情况下，不会再次下载repo库，也就不会设置repo_main，所以这里需要用my_main设置repo_main。
+  repo_main是在下载repo库后才设置的。
+  在已经存在repo的情况下，不会下载repo库，也就不会设置repo_main。
+  所以对于这种情况，这里需要用my_main更新repo_main。
   """
   if my_main:
     repo_main = my_main
