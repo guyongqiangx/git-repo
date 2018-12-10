@@ -103,17 +103,37 @@ global_options.add_option('--version',
                           help='display this version of repo')
 
 class _Repo(object):
+  """
+  使用.repo目录的路径(如'/path/to/test/.repo')初始化_Repo的类对象
+
+  类对象包含两个成员:
+  - repodir指向.repo目录的路径
+  - commands包含所有repo命令
+  """
   def __init__(self, repodir):
     self.repodir = repodir
     self.commands = all_commands
     # add 'branch' as an alias for 'branches'
     all_commands['branch'] = all_commands['branches']
 
+  """
+  执行具体的repo的子命令，例如：
+  init: argv = ['init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1']
+  sync: argv = ['sync']
+  """
   def _Run(self, argv):
     result = 0
     name = None
     glob = []
 
+    """
+    将argv中的参数分割为两部分：
+    第一个不以'-'开始的项作为name，剩余的项作为argv
+
+    对于'repo init': argv = ['init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1']
+    分割后有：name = 'init'
+             argv = ['-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1']
+    """
     for i in range(len(argv)):
       if not argv[i].startswith('-'):
         name = argv[i]
@@ -125,6 +145,17 @@ class _Repo(object):
       glob = argv
       name = 'help'
       argv = []
+    """
+    解析main.py脚本中的参数项，包括:
+    Options:
+      -h, --help      show this help message and exit
+      -p, --paginate  display command output in the pager
+      --no-pager      disable the pager
+      --color=COLOR   control color usage: auto, always, never
+      --trace         trace git command execution
+      --time          time repo command execution
+      --version       display this version of repo
+    """
     gopts, _gargs = global_options.parse_args(glob)
 
     if gopts.trace:
@@ -138,6 +169,9 @@ class _Repo(object):
 
     SetDefaultColoring(gopts.color)
 
+    """
+    构建repo子命令执行的参数和环境
+    """
     try:
       cmd = self.commands[name]
     except KeyError:
@@ -155,6 +189,9 @@ class _Repo(object):
 
     Editor.globalConfig = cmd.manifest.globalConfig
 
+    """
+    检查执行的命令，部分命令对环境有特殊要求:
+    """
     if not isinstance(cmd, MirrorSafeCommand) and cmd.manifest.IsMirror:
       print("fatal: '%s' requires a working directory" % name,
             file=sys.stderr)
@@ -171,6 +208,13 @@ class _Repo(object):
       return 1
 
     try:
+      """
+      调用repo子命令的OptionParser对参数进行解析。
+      如'repo init': argv = ['-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1']
+      如'repo sync': argv = []
+
+      copts: cmd opts; cargs: cmd args
+      """
       copts, cargs = cmd.OptionParser.parse_args(argv)
       copts = cmd.ReadEnvironmentOptions(copts)
     except NoManifestException as e:
@@ -280,6 +324,9 @@ def _CheckRepoDir(repo_dir):
     print('no --repo-dir argument', file=sys.stderr)
     sys.exit(1)
 
+"""
+从argv列表中'--'项前移除opt内的项
+"""
 def _PruneOptions(argv, opt):
   i = 0
   while i < len(argv):
@@ -513,28 +560,38 @@ def init_http():
 main.py脚本入口'__main__'调用这里的'_Main(argv)'
 
   命令:'repo init -u https://android.googlesource.com/platform/manifest -b android-4.0.1_r1'
-  _Main(argv)接收的参数argv如下：
-    ['--repo-dir=/path/to/test/.repo',
-     '--wrapper-version=1.23',
-     '--wrapper-path=/home/rg935739/bin/repo',
-     '--',
-     'init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1',
-     '--repo-url=https://gerrit.googlesource.com/git-repo',
-     '--repo-branch=stable']
+  _Main(argv)接收参数：
+  argv = ['--repo-dir=/path/to/test/.repo',
+          '--wrapper-version=1.23',
+          '--wrapper-path=/home/rg935739/bin/repo',
+          '--',
+          'init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1']
 
   命令:'repo sync'
-  _Main(argv)接收的参数argv如下：
-    ['--repo-dir=/path/to/test/.repo',
-     '--wrapper-version=1.23',
-     '--wrapper-path=/home/rg935739/bin/repo',
-     '--',
-     'sync']
+  _Main(argv)接收参数：
+  argv = ['--repo-dir=/path/to/test/.repo',
+          '--wrapper-version=1.23',
+          '--wrapper-path=/home/rg935739/bin/repo',
+          '--',
+          'sync']
 """
 def _Main(argv):
   result = 0
 
   """
-  移除'--repo-dir', '--wrapper-version', '--wrapper-path'三个不再使用的参数。
+  添加对'--repo-dir', '--wrapper-version', '--wrapper-path'三个参数的解析。
+
+  解析以上3个参数，存放到opt中，在argv中移除这个3个参数后将剩余参数传递给subcmds下的命令去执行。
+
+  以'repo init -u https://android.googlesource.com/platform/manifest -b android-4.0.1_r1'为例:
+  opt = { .repodir = '/path/to/test/.repo',
+          .wrapper-version = '1.23',
+          .wrapper-path = '/path/to/test/.repo/repo/repo' }
+  argv = ['init',
+          '-u',
+          'https://android.googlesource.com/platform/manifest',
+          '-b',
+          'android-4.0.1_r1']
   """
   opt = optparse.OptionParser(usage="repo wrapperinfo -- ...")
   opt.add_option("--repo-dir", dest="repodir",
@@ -548,7 +605,7 @@ def _Main(argv):
 
   """
   检查单独的repo脚本和repo库中的repo脚本版本是否一致
-  如果不一致，显示更新repo脚本的提示信息
+  如果不一致，显示更新单独执行的repo脚本的提示信息
 
   '--repo-dir'需要被设置为'.repo'目录的路径，检查是否已经设置。
   """
@@ -558,11 +615,19 @@ def _Main(argv):
   Version.wrapper_version = opt.wrapper_version
   Version.wrapper_path = opt.wrapper_path
 
+  """
+  使用repo库的路径repodir(如'/path/to/test/.repo')初始化_Repo对象。
+  """
   repo = _Repo(opt.repodir)
   try:
     try:
       init_ssh()
       init_http()
+      """
+      将repo的子命令转入到_Repo对象中执行，例如：
+      init: argv = ['init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1']
+      sync: argv = ['sync']
+      """
       result = repo._Run(argv) or 0
     finally:
       close_ssh()
@@ -597,9 +662,7 @@ main.py脚本入口
         '--wrapper-version=1.23',
         '--wrapper-path=/home/rg935739/bin/repo',
         '--',
-        'init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1',
-        '--repo-url=https://gerrit.googlesource.com/git-repo',
-        '--repo-branch=stable']
+        'init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1']
 
   命令:'repo sync'
   main.py接收到的参数sys.argv[]如下：
