@@ -144,6 +144,9 @@ class GitCommand(object):
                gitdir = None):
     env = os.environ.copy()
 
+    """
+    从复制的环境变量中清除以下跟GIT相关的变量。
+    """
     for key in [REPO_TRACE,
               GIT_DIR,
               'GIT_ALTERNATE_OBJECT_DIRECTORIES',
@@ -157,6 +160,14 @@ class GitCommand(object):
     # If we are not capturing std* then need to print it.
     self.tee = {'stdout': not capture_stdout, 'stderr': not capture_stderr}
 
+    """
+    添加以下环境变量：
+    - 'GIT_EDITOR'
+    - 'REPO_SSH_SOCK'
+    - 'GIT_SSH'
+    - 'GIT_CONFIG_PARAMETERS'
+    - 'GIT_ALLOW_PROTOCOL'
+    """
     if disable_editor:
       _setenv(env, 'GIT_EDITOR', ':')
     if ssh_proxy:
@@ -183,12 +194,21 @@ class GitCommand(object):
       if gitdir:
         _setenv(env, GIT_DIR, gitdir)
       cwd = None
+
     command.append(cmdv[0])
     # Need to use the --progress flag for fetch/clone so output will be
     # displayed as by default git only does progress output if stderr is a TTY.
+    """
+    对于'git fetch'和'git clone'命令，添加'--progress'选项。
+    """
     if sys.stderr.isatty() and cmdv[0] in ('fetch', 'clone'):
       if '--progress' not in cmdv and '--quiet' not in cmdv:
         command.append('--progress')
+    """
+    生成完整git命令，如：
+    'git init'
+    'git config --file /path/to/test/.repo/manifests.git/config --null --list'
+    """
     command.extend(cmdv[1:])
 
     if provide_stdin:
@@ -217,6 +237,12 @@ class GitCommand(object):
         dbg += ': export GIT_DIR=%s\n' % env[GIT_DIR]
         LAST_GITDIR = env[GIT_DIR]
 
+      """
+      格式化git命令在串口的输出，如：
+      ': git init 1>| 2>|'
+      ': git --version 1>| 2>|'
+      ': git fetch origin --tags +refs/heads/*:refs/remotes/origin/* +refs/heads/3.2.0:refs/remotes/origin/3.2.0 1>| 2>|'
+      """
       dbg += ': '
       dbg += ' '.join(command)
       if stdin == subprocess.PIPE:
@@ -227,6 +253,9 @@ class GitCommand(object):
         dbg += ' 2>|'
       Trace('%s', dbg)
 
+    """
+    执行git命令
+    """
     try:
       p = subprocess.Popen(command,
                            cwd = cwd,
@@ -251,6 +280,9 @@ class GitCommand(object):
       _remove_ssh_client(p)
     return rc
 
+  """
+  抓取git命令的输出
+  """
   def _CaptureOutput(self):
     p = self.process
     s_in = [_sfd(p.stdout, sys.stdout, 'stdout'),

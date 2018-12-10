@@ -113,7 +113,57 @@ class _XmlRemote(object):
 class XmlManifest(object):
   """manages the repo configuration file"""
 
+  """
+  使用传入'.repo'(如: '/path/to/test/.repo')的路径实例化XmlManifest类对象。
+  """
   def __init__(self, repodir):
+    """
+    $ tree .repo -ad -L 2
+    .repo
+    ├── manifests
+    │   └── .git
+    ├── manifests.git
+    │   ├── branches
+    │   ├── hooks
+    │   ├── info
+    │   ├── logs
+    │   ├── objects
+    │   ├── refs
+    │   ├── rr-cache
+    │   └── svn
+    └── repo
+        ├── docs
+        ├── .git
+        ├── hooks
+        ├── subcmds
+        └── tests
+    以repodir='/path/to/test/.repo'为例：
+
+    默认初始化以下成员：
+    .repodir = '/path/to/test/.repo'
+    .topdir = '/path/to/test'
+    .manifestFile = '/path/to/test/.repo/manifest.xml'
+    .globalConfig = GitConfig(configfile='~/.gitconfig')
+    .localManifestWarning = False
+    .isGitcClient = False
+    .repoProject = MetaProject(    name='repo',
+                                 gitdir='/path/to/test/.repo/repo/.git',
+                               worktree='/path/to/test/.repo/repo')
+    .manifestProject = MetaProject(name='manifests',
+                                 gitdir='/path/to/test/.repo/manifests.git',
+                               worktree='/path/to/test/.repo/manifests')
+
+    _Unload()操作更新一下成员：
+    ._loaded = False
+    ._projects = {}
+    ._paths = {}
+    ._remotes = {}
+    ._default = None
+    ._repo_hooks_project = None
+    ._notice = None
+    .branch = None
+    ._manifest_server = None
+    """
     self.repodir = os.path.abspath(repodir)
     self.topdir = os.path.dirname(self.repodir)
     self.manifestFile = os.path.join(self.repodir, MANIFEST_FILE_NAME)
