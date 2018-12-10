@@ -1002,6 +1002,7 @@ cmd = 'init'
 arg = ['-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1']
 
 如果args中包含'-h'或'--help'项, 则opt.help=True
+cmd为args中第一个不以'-'开头的项，其余项都作为arg
 """
 def _ParseArguments(args):
   cmd = None
@@ -1012,9 +1013,6 @@ def _ParseArguments(args):
     a = args[i]
     if a == '-h' or a == '--help':
       opt.help = True
-    """
-    cmd为args中第一个不以'-'开头的项，其余项都作为arg
-    """
     elif not a.startswith('-'):
       cmd = a
       arg = args[i + 1:]
