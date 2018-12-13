@@ -489,7 +489,15 @@ def _Init(args, gitc_init=False):
     raise
 
 
+"""
+从git版本字符串中提取版本号，并以tuple方式返回。
+
+'git version 2.7.4' --> (2,7,4)
+"""
 def ParseGitVersion(ver_str):
+  """
+  检查git版本字符串的格式。
+  """
   if not ver_str.startswith('git version '):
     return None
 
@@ -503,7 +511,13 @@ def ParseGitVersion(ver_str):
   return tuple(to_tuple)
 
 
+"""
+检查git的版本号是否低于指定的(1,7,2)
+"""
 def _CheckGitVersion():
+  """
+  构建并执行命令'git --version'
+  """
   cmd = [GIT, '--version']
   try:
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
@@ -516,6 +530,9 @@ def _CheckGitVersion():
            file=sys.stderr)
     raise CloneFailure()
 
+  """
+  捕获'git --version'命令的输出，并调用ParseGitVersion()进行解析，返回版本的三元组，如：(2,7,4)
+  """
   ver_str = proc.stdout.read().strip()
   proc.stdout.close()
   proc.wait()
@@ -525,6 +542,9 @@ def _CheckGitVersion():
     _print('error: "%s" unsupported' % ver_str, file=sys.stderr)
     raise CloneFailure()
 
+  """
+  检查git的版本是否低于(1,7,2)
+  """
   if ver_act < MIN_GIT_VERSION:
     need = '.'.join(map(str, MIN_GIT_VERSION))
     _print('fatal: git %s or later required' % need, file=sys.stderr)

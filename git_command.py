@@ -32,6 +32,9 @@ GIT_DIR = 'GIT_DIR'
 LAST_GITDIR = None
 LAST_CWD = None
 
+"""
+以下关于ssh操作的部分不太明白，不影响对整理的理解，暂时略过
+"""
 _ssh_proxy_path = None
 _ssh_sock_path = None
 _ssh_clients = []
@@ -89,6 +92,11 @@ class _sfd(object):
     return self.fd.fileno()
 
 class _GitCall(object):
+  """
+  返回git的版本号字符串，如：'git version 2.7.4'
+
+  执行'git --version'命令，并返回其输出。
+  """
   def version(self):
     p = GitCommand(None, ['--version'], capture_stdout=True)
     if p.Wait() == 0:
@@ -98,16 +106,25 @@ class _GitCall(object):
         return p.stdout
     return None
 
+  """
+  以tuple方式返回git的版本号，如'git version 2.7.4'，返回(2,7,4)
+  """
   def version_tuple(self):
     global _git_version
     if _git_version is None:
       ver_str = git.version()
+      """
+      使用repo脚本的ParseGitVersion()函数解析git版本号。
+      """
       _git_version = Wrapper().ParseGitVersion(ver_str)
       if _git_version is None:
         print('fatal: "%s" unsupported' % ver_str, file=sys.stderr)
         sys.exit(1)
     return _git_version
 
+  """
+  将_GitCall对象的属性转换为相应命令来执行
+  """
   def __getattr__(self, name):
     name = name.replace('_','-')
     def fun(*cmdv):
@@ -117,6 +134,11 @@ class _GitCall(object):
     return fun
 git = _GitCall()
 
+"""
+检查git版本是否满足最小版本min_version
+
+在fail=True的情况下，如果不满足最小版本要求，则显示警告信息并退出。
+"""
 def git_require(min_version, fail=False):
   git_version = git.version_tuple()
   if min_version <= git_version:
@@ -130,6 +152,18 @@ def git_require(min_version, fail=False):
 def _setenv(env, name, value):
   env[name] = value.encode()
 
+"""
+GitCommand用于执行git命令并捕获其输出(标准输出和标准错误输出)
+
+包含两个操作：
+- 初始化: GitCommand()
+- 等待: Wait()
+使用方式如下： (以'git --version'为例)
+  p = GitCommand(None, ['--version'], capture_stdout=True, capture_stderr=True)
+  p.Wait()
+  使用p.stdout访问stdout的内容
+  使用p.stderr访问stderr的内容
+"""
 class GitCommand(object):
   def __init__(self,
                project,
@@ -157,6 +191,12 @@ class GitCommand(object):
       if key in env:
         del env[key]
 
+    """
+    根据capture_stdout和capture_stderr决定是否需要抓取标准输出和标准错误输出
+    默认:
+    - tee['stdout'] = True
+    - tee['stderr'] = True
+    """
     # If we are not capturing std* then need to print it.
     self.tee = {'stdout': not capture_stdout, 'stderr': not capture_stderr}
 
@@ -183,6 +223,9 @@ class GitCommand(object):
       _setenv(env, 'GIT_ALLOW_PROTOCOL',
               'file:git:http:https:ssh:persistent-http:persistent-https:sso:rpc')
 
+    """
+    设置git命令执行的路径(cwd)和相应的'.git'目录(gitdir)
+    """
     if project:
       if not cwd:
         cwd = project.worktree
@@ -219,6 +262,9 @@ class GitCommand(object):
     stdout = subprocess.PIPE
     stderr = subprocess.PIPE
 
+    """
+    跟踪cwd和gitdir的变化
+    """
     if IsTrace():
       global LAST_CWD
       global LAST_GITDIR
@@ -272,6 +318,9 @@ class GitCommand(object):
     self.process = p
     self.stdin = p.stdin
 
+  """
+  等待git命令的执行，并返回其输出内容
+  """
   def Wait(self):
     try:
       p = self.process
