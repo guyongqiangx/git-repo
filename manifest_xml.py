@@ -53,13 +53,34 @@ class _Default(object):
   sync_c = False
   sync_s = False
 
+  """
+  运算符重载
+
+  如果两个对象的__dict__成员列表值一样，说明二者相同
+  """
   def __eq__(self, other):
     return self.__dict__ == other.__dict__
 
+  """
+  运算符重载
+
+  如果两个对象的__dict__成员列表值不一样，说明二者不同
+  """
   def __ne__(self, other):
     return self.__dict__ != other.__dict__
 
 class _XmlRemote(object):
+  """
+  初始化类对象，成员包括：
+  .name
+  .fetchUrl
+  .pushUrl
+  .manifestUrl
+  .remoteAlias
+  .reviewUrl
+  .revision
+  .resolvedFetchUrl
+  """
   def __init__(self,
                name,
                alias=None,
@@ -152,17 +173,6 @@ class XmlManifest(object):
     .manifestProject = MetaProject(name='manifests',
                                  gitdir='/path/to/test/.repo/manifests.git',
                                worktree='/path/to/test/.repo/manifests')
-
-    _Unload()操作更新一下成员：
-    ._loaded = False
-    ._projects = {}
-    ._paths = {}
-    ._remotes = {}
-    ._default = None
-    ._repo_hooks_project = None
-    ._notice = None
-    .branch = None
-    ._manifest_server = None
     """
     self.repodir = os.path.abspath(repodir)
     self.topdir = os.path.dirname(self.repodir)
@@ -179,10 +189,28 @@ class XmlManifest(object):
       gitdir   = os.path.join(repodir, 'manifests.git'),
       worktree = os.path.join(repodir, 'manifests'))
 
+    """
+    _Unload()操作更新以下成员：
+    ._loaded = False
+    ._projects = {}
+    ._paths = {}
+    ._remotes = {}
+    ._default = None
+    ._repo_hooks_project = None
+    ._notice = None
+    .branch = None
+    ._manifest_server = None
+    """
     self._Unload()
 
   def Override(self, name):
     """Use a different manifest, just for the current instantiation.
+    """
+    """
+    获取名为name的文件的完整路径
+
+    如果name='default.xml'，则有：
+        path='/path/to/test/.repo/manifests/default.xml'
     """
     path = os.path.join(self.manifestProject.worktree, name)
     if not os.path.isfile(path):
@@ -202,6 +230,16 @@ class XmlManifest(object):
     self.Override(name)
 
     try:
+      """
+      关于：os.path.lexists(path)
+        Return True if path refers to an existing path. Returns True for broken symbolic links.
+
+      这里不论manifestFile是真实的文件还是链接文件，都先删除，然后将'manifests/name'文件链接到manifestFile。
+
+      类似以下操作：
+      $ rm -rf '/path/to/test/.repo/manifest.xml'
+      $ ln -s 'manifests/default.xml' '/path/to/test/.repo/manifest.xml'
+      """
       if os.path.lexists(self.manifestFile):
         os.remove(self.manifestFile)
       os.symlink('manifests/%s' % name, self.manifestFile)
@@ -444,18 +482,61 @@ class XmlManifest(object):
     self.branch = None
     self._manifest_server = None
 
+  """
+  在克隆的清单库中，当前分支名称始终为'default', _Load操作找到当前分支对应的原始分支用于设置branch成员。
+
+  所以branch成员保存了正真的分支名称。
+
+  同时，加载
+  - 远程 manifest.xml以及
+  - 本地 local_manifests目录下的所有xml文件(原来的方式是local_manifest.xml文件)
+  中的所有nodes节点并进行解析。
+  """
   def _Load(self):
     if not self._loaded:
+      """
+      $ git branch
+      * default
+      $ cat .git/config
+      ...
+      [remote "origin"]
+        url = https://android.googlesource.com/platform/manifest
+        fetch = +refs/heads/*:refs/remotes/origin/*
+      [branch "default"]
+              remote = origin
+              merge = refs/heads/android-4.0.1_r1
+      从以上操作可见，当前位于'default'分支，对于'default'分支，其：
+      remote = origin
+      merge = refs/heads/android-4.0.1_r1
+
+      因此这里:
+      m.CurrentBranch='default'
+      m.GetBranch(m.CurrentBranch).merge='refs/heads/android-4.0.1_r1'
+
+      经过处理后，b='android-4.0.1_r1'
+      所以最终 self.branch='android-4.0.1_r1'
+      """
       m = self.manifestProject
       b = m.GetBranch(m.CurrentBranch).merge
       if b is not None and b.startswith(R_HEADS):
         b = b[len(R_HEADS):]
       self.branch = b
 
+      """
+      加载manifestFile ='/path/to/test/.repo/manifest.xml'中的nodes节点。
+      """
       nodes = []
       nodes.append(self._ParseManifestXml(self.manifestFile,
                                           self.manifestProject.worktree))
 
+      """
+      local='/path/to/test/.repo/local_manifest.xml'
+
+      如果local文件存在，提示一个警告信息，然后加载local指定的manifest文件的nodes节点。
+      现在已经不提倡使用'/path/to/test/.repo/local_manifest.xml'文件来存放本地的manifest。
+
+      新的方式建议将local的manifest存放到'/path/to/test/.repo/local_manifests'目录下。
+      """
       local = os.path.join(self.repodir, LOCAL_MANIFEST_NAME)
       if os.path.exists(local):
         if not self.localManifestWarning:
@@ -465,6 +546,9 @@ class XmlManifest(object):
                 file=sys.stderr)
         nodes.append(self._ParseManifestXml(local, self.repodir))
 
+      """
+      依次加载local_manifests目录'/path/to/test/.repo/local_manifests'目录下的所有xml文件的nodes节点。
+      """
       local_dir = os.path.abspath(os.path.join(self.repodir, LOCAL_MANIFESTS_DIR_NAME))
       try:
         for local_file in sorted(os.listdir(local_dir)):
@@ -474,6 +558,12 @@ class XmlManifest(object):
       except OSError:
         pass
 
+      """
+      解析从:
+      - '/path/to/test/.repo/manifest.xml'文件和
+      - '/path/to/test/.repo/local_manifests'目录下的所有xml文件
+      的nodes节点中提取的信息。
+      """
       try:
         self._ParseManifest(nodes)
       except ManifestParseError as e:
@@ -482,6 +572,9 @@ class XmlManifest(object):
         self._Unload()
         raise e
 
+      """
+      如果当前repo克隆时指定了'--mirror'选项，这里就将repoProject和manifestProject也添加到Mirror中。
+      """
       if self.IsMirror:
         self._AddMetaProjectMirror(self.repoProject)
         self._AddMetaProjectMirror(self.manifestProject)
