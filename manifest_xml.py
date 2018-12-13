@@ -69,6 +69,9 @@ class _Default(object):
   def __ne__(self, other):
     return self.__dict__ != other.__dict__
 
+"""
+构建_XmlRemote对象
+"""
 class _XmlRemote(object):
   """
   初始化类对象，成员包括：
@@ -104,6 +107,9 @@ class _XmlRemote(object):
   def __ne__(self, other):
     return self.__dict__ != other.__dict__
 
+  """
+  使用fetchUrl或menifestUrl来构建resolvedFetchUrl
+  """
   def _resolveFetchUrl(self):
     url = self.fetchUrl.rstrip('/')
     manifestUrl = self.manifestUrl.rstrip('/')
@@ -581,6 +587,13 @@ class XmlManifest(object):
 
       self._loaded = True
 
+  """
+  加载include_root下的path指定的xml文件，并将manifest节点下的所有子节点添加到nodes[]列表中。
+  如果xml文件的manifest节包含'incude'节点，则递归加载incude指定的xml文件。
+
+  如：
+  _ParseManifestXml(path='/path/to/test/.repo/manifest.xml', include_root='/path/to/test/.repo/manifests')
+  """
   def _ParseManifestXml(self, path, include_root):
     try:
       root = xml.dom.minidom.parse(path)
@@ -590,12 +603,20 @@ class XmlManifest(object):
     if not root or not root.childNodes:
       raise ManifestParseError("no root node in %s" % (path,))
 
+    """
+    找到名为'manifest'的节点
+    """
     for manifest in root.childNodes:
       if manifest.nodeName == 'manifest':
         break
     else:
       raise ManifestParseError("no <manifest> in %s" % (path,))
 
+    """
+    如果节点中包含名为'include'的节点，则进一步递归解析'include'指示的xml文件。
+
+    将所有的节点添加到nodes[]列表中。
+    """
     nodes = []
     for node in manifest.childNodes:  # pylint:disable=W0631
                                       # We only get here if manifest is initialised
@@ -606,6 +627,9 @@ class XmlManifest(object):
           raise ManifestParseError("include %s doesn't exist or isn't a file"
               % (name,))
         try:
+          """
+          递归加载'include'包含的xml文件
+          """
           nodes.extend(self._ParseManifestXml(fp, include_root))
         # should isolate this to the exact exception, but that's
         # tricky.  actual parsing implementation may vary.
@@ -619,6 +643,13 @@ class XmlManifest(object):
     return nodes
 
   def _ParseManifest(self, node_list):
+    """
+    循环解析节点列表中的节点
+
+    对于'remote'节点，解析并构造_Remote对象，然后添加到_remotes字典中。
+    如：
+    aosp: <remote  name="aosp"  fetch=".." />
+    """
     for node in itertools.chain(*node_list):
       if node.nodeName == 'remote':
         remote = self._ParseRemote(node)
@@ -631,6 +662,11 @@ class XmlManifest(object):
           else:
             self._remotes[remote.name] = remote
 
+    """
+    对于'default'节点，解析并构造_Default对象，用于设置_default成员
+    如：
+    aosp: <default revision="refs/tags/android-4.0.1_r1" remote="aosp" sync-j="4" />
+    """
     for node in itertools.chain(*node_list):
       if node.nodeName == 'default':
         new_default = self._ParseDefault(node)
@@ -643,6 +679,11 @@ class XmlManifest(object):
     if self._default is None:
       self._default = _Default()
 
+    """
+    对于'notice'节点，解析并构造_Notice对象，用于设置_notice成员
+
+    很多manifest节点不包含'notice'节点
+    """
     for node in itertools.chain(*node_list):
       if node.nodeName == 'notice':
         if self._notice is not None:
@@ -651,6 +692,12 @@ class XmlManifest(object):
               (self.manifestFile))
         self._notice = self._ParseNotice(node)
 
+    """
+    对于'manifest-server'节点，解析并用于设置_manifest_server成员
+
+    如：
+    <manifest-server url="http://android-smartsync.corp.google.com/manifestserver"/>
+    """
     for node in itertools.chain(*node_list):
       if node.nodeName == 'manifest-server':
         url = self._reqatt(node, 'url')
@@ -675,6 +722,12 @@ class XmlManifest(object):
       for subproject in project.subprojects:
         recursively_add_projects(subproject)
 
+    """
+    对于'project'节点，解析并构造_Project对象，用于设置_default成员
+    如：
+    op-tee: <project path="build" name="OP-TEE/build.git" revision="refs/tags/3.2.0" clone-depth="1">
+      aosp: <project path="abi/cpp" name="platform/abi/cpp" />
+    """
     for node in itertools.chain(*node_list):
       if node.nodeName == 'project':
         project = self._ParseProject(node)
@@ -778,9 +831,21 @@ class XmlManifest(object):
       self._projects[project.name] = [project]
       self._paths[project.relpath] = project
 
+  """
+  解析manifest中的'remote'节点。
+  使用节点的'name', 'alias', 'fetch', 'pushurl', 'review'和'revision'属性构建_Remote对象。
+
+  如：
+  op-tee: <remote name="github" fetch="https://github.com" />
+    aosp: <remote  name="aosp"  fetch=".." />
+  others: <remote  name="bcg"   fetch="ssh://gitbsesw@xxx.xxx.xxx/aosp"  review="http://xxx.xxx.xxx:8081/" />
+  """
   def _ParseRemote(self, node):
     """
     reads a <remote> element from the manifest file
+    """
+    """
+    解析<remote>节点的'name', 'alias', 'fetch', 'pushurl', 'review'和'revision'属性
     """
     name = self._reqatt(node, 'name')
     alias = node.getAttribute('alias')
@@ -796,9 +861,28 @@ class XmlManifest(object):
     revision = node.getAttribute('revision')
     if revision == '':
       revision = None
+    """
+    获取.git/config中remote.origin.url的属性，并赋值给manifestUrl。
+    如：
+    $ cat .git/config
+    ...
+    [remote "origin"]
+            url = https://android.googlesource.com/platform/manifest
+            fetch = +refs/heads/*:refs/remotes/origin/*
+    ...
+    """
     manifestUrl = self.manifestProject.config.GetString('remote.origin.url')
     return _XmlRemote(name, alias, fetch, pushUrl, manifestUrl, review, revision)
 
+  """
+  解析manifest中的'default'节点。
+  使用节点的'revision', 'dest-branch', 'sync-j', 'sync-c', 'sync-s'属性构建_Default对象。
+
+  如：
+  op-tee: <default remote="github" revision="master" />
+    aosp: <default revision="refs/tags/android-4.0.1_r1" remote="aosp" sync-j="4" />
+  others: <default remote="yvr" revision="p-tv-dev" sync-j="4" />
+  """
   def _ParseDefault(self, node):
     """
     reads a <default> element from the manifest file
@@ -875,6 +959,14 @@ class XmlManifest(object):
   def _UnjoinName(self, parent_name, name):
     return os.path.relpath(name, parent_name)
 
+  """
+  解析manifest中的'project'节点。
+  使用节点的'name', 'revision', 'path', 'rebase', 'sync-c', 'sync-s', 'clone-depth', 'dest-branch', 'upstream', 'groups'构建_Prject对象。
+
+  如：
+  op-tee: <project path="build" name="OP-TEE/build.git" revision="refs/tags/3.2.0" clone-depth="1">
+    aosp: <project path="abi/cpp" name="platform/abi/cpp" />
+  """
   def _ParseProject(self, node, parent = None, **extra_proj_attrs):
     """
     reads a <project> element from the manifest file
@@ -936,6 +1028,10 @@ class XmlManifest(object):
 
     upstream = node.getAttribute('upstream')
 
+    """
+    节点含有'groups'属性的情况：
+    如：<project groups="pdk" name="platform/bootable/recovery" path="bootable/recovery" />
+    """
     groups = ''
     if node.hasAttribute('groups'):
       groups = node.getAttribute('groups')
@@ -947,6 +1043,9 @@ class XmlManifest(object):
       relpath, worktree, gitdir, objdir = \
           self.GetSubprojectPaths(parent, name, path)
 
+    """
+    默认的groups属性为'all'
+    """
     default_groups = ['all', 'name:%s' % name, 'path:%s' % relpath]
     groups.extend(set(default_groups).difference(groups))
 
@@ -954,6 +1053,9 @@ class XmlManifest(object):
       if node.getAttribute('force-path').lower() in ("yes", "true", "1"):
         gitdir = os.path.join(self.topdir, '%s.git' % path)
 
+    """
+    针对每一个project构建一个Project对象
+    """
     project = Project(manifest = self,
                       name = name,
                       remote = remote.ToRemoteSpec(name),
