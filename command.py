@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2008 The Android Open Source Project
 #
@@ -23,6 +24,9 @@ from error import NoSuchProjectError
 from error import InvalidProjectGroupsError
 
 
+"""
+所有repo命令的基类
+"""
 class Command(object):
   """Base class for any command line action in repo.
   """
@@ -34,13 +38,51 @@ class Command(object):
   def WantPager(self, _opt):
     return False
 
+  """
+  检查opts中依赖于环境变量的选项，并使用相应环境变量来设置该选项的值。
+
+  例如，'init.py'中设定'init'命令的选项'reference'和'manifest_url'需要分别检查环境变量'REPO_MIRROR_LOCATION'和'REPO_MANIFEST_URL'
+  所以这里需要使用这两个环境变量的值来更新'opts'中的'reference'和'manifest_url'。
+
+  所有的子命令中，也只有'subcmds/init.py'定义了环境变量依赖。
+  """
   def ReadEnvironmentOptions(self, opts):
     """ Set options from environment variables. """
 
+    """
+    repo init: 'repo init -u https://android.googlesource.com/platform/manifest -b android-4.0.1_r1'
+    opts: {    'archive': None,
+           'config_name': False,
+                 'depth': None,
+                'groups': 'default',
+       'manifest_branch': 'android-4.0.1_r1',
+         'manifest_name': 'default.xml',
+          'manifest_url': 'https://android.googlesource.com/platform/manifest',
+                'mirror': None,
+       'no_clone_bundle': None,
+        'no_repo_verify': None,
+              'platform': 'auto',
+                 'quiet': False,
+             'reference': None,
+           'repo_branch': None,
+              'repo_rul': None}
+
+    init.py中定义了函数_RegisteredEnvironmentOptions()，返回：
+    env_options: {'REPO_MIRROR_LOCATION': 'reference',
+                     'REPO_MANIFEST_URL': 'manifest_url'}
+    因此，这里说明'reference'和'manifest_url'需要分别检查环境变量'REPO_MIRROR_LOCATION'和'REPO_MANIFEST_URL'
+    """
     env_options = self._RegisteredEnvironmentOptions()
 
     for env_key, opt_key in env_options.items():
       # Get the user-set option value if any
+      """
+      init.py中定义的init命令需要检查的选项和相应的环境变量：
+                     env_key | opt_key
+                     ------- | -------
+      'REPO_MIRROR_LOCATION' | 'reference'
+         'REPO_MANIFEST_URL' | 'manifest_url'
+      """
       opt_value = getattr(opts, opt_key)
 
       # If the value is set, it means the user has passed it as a command
@@ -49,12 +91,21 @@ class Command(object):
       if opt_value is not None:
         continue
 
+      """
+      使用环境变量中的值来更新opts选项中的对应值。
+      """
       env_value = os.environ.get(env_key)
       if env_value is not None:
         setattr(opts, opt_key, env_value)
 
     return opts
 
+  """
+  构建Command的OptionParser属性
+
+  外界的调用方式：
+  cmd.OptionParser.parse_args(argv)
+  """
   @property
   def OptionParser(self):
     if self._optparse is None:
@@ -71,6 +122,11 @@ class Command(object):
     """Initialize the option parser.
     """
 
+  """
+  设置命令依赖的环境变量，默认为空，需要由具体的子类来实现
+
+  所有的子命令中，也只有'subcmds/init.py'定义了环境变量依赖。
+  """
   def _RegisteredEnvironmentOptions(self):
     """Get options that can be set from environment variables.
 
@@ -95,14 +151,25 @@ class Command(object):
     self.OptionParser.print_usage()
     sys.exit(1)
 
+  """
+  命令的执行函数，由Command的具体命令子类来实现。
+  """
   def Execute(self, opt, args):
     """Perform the action, after option parsing is complete.
     """
     raise NotImplementedError
 
+  """
+  使用projects中每个project的worktree来构建一个(worktree, project)的字典。
+
+  这里的_by_path是一个包含(worktree, project)的字典。
+  """
   def _ResetPathToProjectMap(self, projects):
     self._by_path = dict((p.worktree, p) for p in projects)
 
+  """
+  更新_py_path字典中'project.worktree'键对应的project值。
+  """
   def _UpdatePathToProjectMap(self, project):
     self._by_path[project.worktree] = project
 
