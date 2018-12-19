@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2008 The Android Open Source Project
 #
@@ -43,6 +44,9 @@ LOCAL_MANIFESTS_DIR_NAME = 'local_manifests'
 urllib.parse.uses_relative.extend(['ssh', 'git', 'persistent-https', 'rpc'])
 urllib.parse.uses_netloc.extend(['ssh', 'git', 'persistent-https', 'rpc'])
 
+"""
+_Default类对象
+"""
 class _Default(object):
   """Project defaults within the manifest."""
 
@@ -70,7 +74,7 @@ class _Default(object):
     return self.__dict__ != other.__dict__
 
 """
-构建_XmlRemote对象
+_XmlRemote对象
 """
 class _XmlRemote(object):
   """
