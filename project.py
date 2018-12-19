@@ -39,6 +39,12 @@ from trace import IsTrace, Trace
 
 from git_refs import GitRefs, HEAD, R_HEADS, R_TAGS, R_PUB, R_M
 
+"""
+urllib的兼容性处理
+
+Python2中的urlparse模块在Python3中被重新命名为urllib.parse。
+这里统一通过urllib.parse进行调用。
+"""
 from pyversion import is_python3
 if is_python3():
   import urllib.parse
@@ -118,6 +124,11 @@ class DownloadedChange(object):
     self.ps_id = ps_id
     self.commit = commit
 
+  """
+  .commits 属性
+
+  命令：
+  """
   @property
   def commits(self):
     if self._commit_cache is None:
@@ -2642,7 +2653,40 @@ class Project(object):
         return line[5:-1]
       return line[:-1]
 
+    """
+    设置HEAD引用，指向给定的分支ref
+    """
     def SetHead(self, ref, message=None):
+      """
+      构造并执行命令：'git symbolic-ref -m message HEAD ref'
+
+      例如这里的HEAD原来指向stable分支，使用'symbolic-ref'将HEAD指向新的comments分支:
+      $ cat .git/HEAD
+      ref: refs/heads/stable
+      $ git branch -a
+        comments
+        guyongqiangx
+      * stable
+        remotes/origin/HEAD -> origin/guyongqiangx
+        remotes/origin/comments
+        remotes/origin/guyongqiangx
+        remotes/origin/maint
+        remotes/origin/master
+        remotes/origin/stable
+      $ git symbolic-ref HEAD refs/heads/comments
+      $ cat .git/HEAD
+      ref: refs/heads/comments
+      $ git branch -a
+      * comments
+        guyongqiangx
+        stable
+        remotes/origin/HEAD -> origin/guyongqiangx
+        remotes/origin/comments
+        remotes/origin/guyongqiangx
+        remotes/origin/maint
+        remotes/origin/master
+        remotes/origin/stable
+      """
       cmdv = []
       if message is not None:
         cmdv.extend(['-m', message])
@@ -2650,7 +2694,39 @@ class Project(object):
       cmdv.append(ref)
       self.symbolic_ref(*cmdv)
 
+    """
+    分离头指针, 将其指向new指定的对象，可以是任意commits提交
+    """
     def DetachHead(self, new, message=None):
+      """
+      构造并执行命令：'git update-ref --no-deref -m message HEAD new'
+
+      命令'git update-ref HEAD <newvalue>', 将当前分支头HEAD更新为新对象<newvalue>
+
+      例如：原来的HEAD指向提交2ea37bc, 使用'git update-ref HEAD 2d81db7'将其指向第4个开始的提交:
+      $ git rev-parse --short HEAD
+      2ea37bc
+      $ git log -10 --format=%h
+      2ea37bc
+      aa24c6e
+      ffcaf75
+      2d81db7
+      a39539c
+      3c8b7c5
+      f231aa2
+      ea35d70
+      f3946d0
+      a0adc9f
+      $ git update-ref HEAD 2d81db7
+      $ git rev-parse --short HEAD
+      2d81db7
+      $ git log -5 --format=%h
+      2d81db7
+      a39539c
+      3c8b7c5
+      f231aa2
+      ea35d70
+      """
       cmdv = ['--no-deref']
       if message is not None:
         cmdv.extend(['-m', message])
@@ -2658,9 +2734,50 @@ class Project(object):
       cmdv.append(new)
       self.update_ref(*cmdv)
 
+    """
+    创建或更新名为name的引用，使其指向new指定的对象
+    """
     def UpdateRef(self, name, new, old=None,
                   message=None,
                   detach=False):
+      """
+      构造并执行命令：
+      1. 非detach: 'git update-ref -m message name new old'
+      2. detach: 'git update-ref -m message --no-deref name new old'
+
+      git update-ref <ref> <newvalue> [<oldvalue>]
+      给定三个参数，在验证<ref>的当前值匹配<oldvalue>之后，将<newvalue>存储在<ref>中，可能会解引用符号引用。
+      例如:
+          'git update-ref refs/heads/master <newvalue> <oldvalue>'
+          只有当它的当前值是<oldvalue>时，才将主分支头更新为<newvalue>。
+
+      以下在.git目录下创建一个新的指向aa24c6e提交的引用：
+      $ find . -type f -iname new
+      $ git log -5 --format=%h
+      2ea37bc
+      aa24c6e
+      ffcaf75
+      2d81db7
+      a39539c
+      $ git update-ref new aa24c6e
+      $ find . -type f -iname new
+      ./.git/new
+      $ cat .git/new
+      aa24c6e7ba6f5ce90116f0265b96d2dfef9ece8f
+      $ git rev-parse --short new
+      aa24c6e
+      $ git update-ref new refs/heads/guyongqiangx aa24c6e
+      $ git rev-parse --short new
+      a17df4e
+      $ git rev-parse --short refs/heads/guyongqiangx
+      a17df4e
+
+      可见，
+      操作'git update-ref new aa24c6e'创建new引用后，.git目录下会多一个名为new的文件，其指向提交aa24c6e。
+      操作'git update-ref new refs/heads/guyongqiangx aa24c6e' 将new从原来对aa24c6e的引用更新为指向对'guyongqiangx'分支的引用。
+
+      第二个update-ref操作带有三个参数，因此update-ref在进行操作前会先验证new是否对应与指定的提交aa24c6e，然后才更新引用到'guyongqiangx'分支。
+      """
       cmdv = []
       if message is not None:
         cmdv.extend(['-m', message])
@@ -2672,7 +2789,33 @@ class Project(object):
         cmdv.append(old)
       self.update_ref(*cmdv)
 
+    """
+    删除名为name的引用
+    """
     def DeleteRef(self, name, old=None):
+      """
+      依次执行以下命令：
+      1. 'git rev-parse name';
+      获取name引用指向的提交。
+
+      2. 'git update-ref -d name old'
+      删除name引用，在删除引用前，会先验证是否new应用是否对应于old指定的对象。
+
+      $ git rev-parse new
+      a17df4e9905003362b245d8a78c6f34071d327a7
+      $ git rev-parse guyongqiangx
+      a17df4e9905003362b245d8a78c6f34071d327a7
+      $ git update-ref -d new 2ea37bc
+      error: cannot lock ref 'new': ref new is at a17df4e...27a7 but expected 2ea37bc...c3ba
+      $ git update-ref -d new a17df4e
+      $ git rev-parse new
+      new
+      fatal: ambiguous argument 'new': unknown revision or path not in the working tree.
+      Use '--' to separate paths from revisions, like this:
+      'git <command> [<revision>...] -- [<file>...]'
+
+      操作最后尝试解析new引用时发生错误，因为该引用已经不存在了。
+      """
       if not old:
         old = self.rev_parse(name)
       self.update_ref('-d', name, old)
@@ -2700,6 +2843,9 @@ class Project(object):
                        (self._project.name, str(args), p.stderr))
       return r
 
+    """
+    git_obj.rev_parse('HEAD') --> 'git config HEAD'
+    """
     def __getattr__(self, name):
       """Allow arbitrary git commands using pythonic syntax.
 
@@ -2723,11 +2869,17 @@ class Project(object):
 
       def runner(*args, **kwargs):
         cmdv = []
+        """
+        pop字典kwargs中的'config'项，如果没有，则config=None
+        """
         config = kwargs.pop('config', None)
         for k in kwargs:
           raise TypeError('%s() got an unexpected keyword argument %r'
                           % (name, k))
         if config is not None:
+          """
+          检查git版本是否满足最小版本1.7.2
+          """
           if not git_require((1, 7, 2)):
             raise ValueError('cannot set config on command line for %s()'
                              % name)
