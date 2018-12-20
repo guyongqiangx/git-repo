@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Copyright (C) 2008 The Android Open Source Project
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -2182,10 +2183,21 @@ class Project(object):
       os.remove(bundle_tmp)
     return ok
 
+  """
+  构造curl命令将srcUrl指定的Bundle文件下载到本地tmpPath，
+  检查tmpPath文件是否为有效的Bundle文件，
+  并将其重命名为dstPath
+  """
   def _FetchBundle(self, srcUrl, tmpPath, dstPath, quiet):
     if os.path.exists(dstPath):
       os.remove(dstPath)
 
+    """
+    构造并执行命令:
+         'curl --fail --output tmpPath --netrc --location --silent --cookie cookiefile --cookie-jar cookiefile srcUrl'
+    如果tmpPath指定的文件存在，则计算该文件的size，然后使用'--continue-at size'接着断点续传:
+         'curl --fail --output tmpPath --netrc --location --silent --continue-at 123456 --cookie cookiefile --cookie-jar cookiefile srcUrl'
+    """
     cmd = ['curl', '--fail', '--output', tmpPath, '--netrc', '--location']
     if quiet:
       cmd += ['--silent']
@@ -2223,6 +2235,9 @@ class Project(object):
                 file=sys.stderr)
         return False
 
+    """
+    curl执行成功后检查tmpPath是否为有效的Bundle文件，并重新命名为dstPath
+    """
     if os.path.exists(tmpPath):
       if curlret == 0 and self._IsValidBundle(tmpPath, quiet):
         os.rename(tmpPath, dstPath)
@@ -2233,7 +2248,13 @@ class Project(object):
     else:
       return False
 
+  """
+  检查path指定的文件是否为有效的Bundle文件
+  """
   def _IsValidBundle(self, path, quiet):
+    """
+    尝试打开path指定的文件，并读取前16字节，判读其是否为'# v2 git bundle\n'
+    """
     try:
       with open(path) as f:
         if f.read(16) == '# v2 git bundle\n':
@@ -2245,7 +2266,13 @@ class Project(object):
     except OSError:
       return False
 
+  """
+  签出rev对应的代码
+  """
   def _Checkout(self, rev, quiet=False):
+    """
+    命令: 'git checkout -q rev --'
+    """
     cmd = ['checkout']
     if quiet:
       cmd.append('-q')
@@ -2255,7 +2282,13 @@ class Project(object):
       if self._allrefs:
         raise GitError('%s checkout %s ' % (self.name, rev))
 
+  """
+  拾取rev对应的代码
+  """
   def _CherryPick(self, rev):
+    """
+    命令: 'git cherry-pick rev --'
+    """
     cmd = ['cherry-pick']
     cmd.append(rev)
     cmd.append('--')
@@ -2264,6 +2297,9 @@ class Project(object):
         raise GitError('%s cherry-pick %s ' % (self.name, rev))
 
   def _Revert(self, rev):
+    """
+    命令: 'git revert --no-edit rev --'
+    """
     cmd = ['revert']
     cmd.append('--no-edit')
     cmd.append(rev)
@@ -2273,6 +2309,9 @@ class Project(object):
         raise GitError('%s revert %s ' % (self.name, rev))
 
   def _ResetHard(self, rev, quiet=True):
+    """
+    命令: 'git reset --hard -q rev'
+    """
     cmd = ['reset', '--hard']
     if quiet:
       cmd.append('-q')
@@ -2281,6 +2320,9 @@ class Project(object):
       raise GitError('%s reset --hard %s ' % (self.name, rev))
 
   def _Rebase(self, upstream, onto=None):
+    """
+    命令: 'git rebase --onto onto upstream'
+    """
     cmd = ['rebase']
     if onto is not None:
       cmd.extend(['--onto', onto])
@@ -2289,6 +2331,9 @@ class Project(object):
       raise GitError('%s rebase %s ' % (self.name, upstream))
 
   def _FastForward(self, head, ffonly=False):
+    """
+    命令: 'git merge head --ff-only'
+    """
     cmd = ['merge', head]
     if ffonly:
       cmd.append("--ff-only")
