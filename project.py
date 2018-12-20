@@ -1862,17 +1862,65 @@ class Project(object):
 
 
 # Direct Git Commands ##
+  """
+  获取版本的160位完整哈希
+
+  如：
+  $ git rev-parse --verify HEAD^0
+  676ed5ff9129f153bc3efb9b4bc98b1097f4db1f
+  """
   def _CheckForSha1(self):
     try:
       # if revision (sha or tag) is not present then following function
       # throws an error.
+      """
+      命令：'git rev-parse --verify revisionExpr^0'
+      用于显示版本的完整的hash (160 bit, 20字符)。
+
+      这里'--verify'选项主要是用于验证后续只提供了一个revision号，如果提供多个则出错，如：
+      $ git rev-parse --verify HEAD^0 stable
+      fatal: Needed a single revision
+
+      使用rev-parse操纵示例：
+      $ git rev-parse HEAD
+      676ed5ff9129f153bc3efb9b4bc98b1097f4db1f
+      $ git rev-parse --verify HEAD
+      676ed5ff9129f153bc3efb9b4bc98b1097f4db1f
+      $ git rev-parse --verify HEAD^0
+      676ed5ff9129f153bc3efb9b4bc98b1097f4db1f
+
+      $ git rev-parse --short HEAD
+      676ed5f
+      """
       self.bare_git.rev_parse('--verify', '%s^0' % self.revisionExpr)
       return True
     except GitError:
       # There is no such persistent revision. We have to fetch it.
       return False
 
+  """
+  对self.remote.url指定的git库进行归档，并输出到tarpath指定的文件中。
+  """
   def _FetchArchive(self, tarpath, cwd=None):
+    """
+    命令：'git archive -v -o tarpath --remote=remote.url --prefix=relpath/ revisionExpr'
+
+    这里的remote.url不支持http://或https://
+
+    以本地'/public/test/git-repo'为例，如下操作：
+    $ git archive -v -o git-repo.tar --remote=file:///public/test/git-repo --prefix=google/ stable
+    remote: google/
+    remote: google/.flake8
+    ...
+    remote: google/wrapper.py
+    $ find . -type f -name git-repo.tar
+    ./git-repo.tar
+    $ tar -tvf git-repo.tar
+    drwxrwxr-x root/root         0 2016-09-27 11:05 google/
+    -rw-rw-r-- root/root        50 2016-09-27 11:05 google/.flake8
+    ...
+    -rw-rw-r-- root/root       941 2016-09-27 11:05 google/wrapper.py
+    """
     cmd = ['archive', '-v', '-o', tarpath]
     cmd.append('--remote=%s' % self.remote.url)
     cmd.append('--prefix=%s/' % self.relpath)
@@ -1885,6 +1933,9 @@ class Project(object):
     if command.Wait() != 0:
       raise GitError('git archive %s: %s' % (self.name, command.stderr))
 
+  """
+
+  """
   def _RemoteFetch(self, name=None,
                    current_branch_only=False,
                    initial=False,
@@ -2821,7 +2872,16 @@ class Project(object):
       self.update_ref('-d', name, old)
       self._project.bare_ref.deleted(name)
 
+    """
+    获取指定的提交列表
+    """
     def rev_list(self, *args, **kw):
+      """
+      构造并执行命令：
+      'git log --pretty=format:%h'
+      或
+      'git rev-list --abbrev=8 --abbrev-commit --pretty=oneline --reverse --date-order ...'
+      """
       if 'format' in kw:
         cmdv = ['log', '--pretty=format:%s' % kw['format']]
       else:
@@ -2833,6 +2893,9 @@ class Project(object):
                      gitdir=self._gitdir,
                      capture_stdout=True,
                      capture_stderr=True)
+      """
+      循环读取git命令的输出，并将其添加到r列表中。
+      """
       r = []
       for line in p.process.stdout:
         if line[-1] == '\n':
