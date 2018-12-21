@@ -3220,6 +3220,36 @@ class MetaProject(Project):
   """A special project housed under .repo.
   """
 
+  """
+  在XmlManifest初始化时会实例化两个MetaProject(还有一个manifest参数这里省略了，实际传入为manifest自己的引用self):
+  .repoProject = MetaProject(    name='repo',
+                               gitdir='/path/to/test/.repo/repo/.git',
+                             worktree='/path/to/test/.repo/repo')
+  .manifestProject = MetaProject(name='manifests',
+                               gitdir='/path/to/test/.repo/manifests.git',
+                             worktree='/path/to/test/.repo/manifests')
+  对于'repo'库，初始化时：
+          name='repo'
+        gitdir='/path/to/test/.repo/repo/.git'
+        objdir='/path/to/test/.repo/repo/.git'
+      worktree='/path/to/test/.repo/repo'
+        remote=RemoteSpec('origin')
+       relpath='.repo/repo'
+  revisionExpr='refs/heads/master'
+    revisionId=None
+        groups=None
+
+  对于'manifests'库，则初始化时：
+          name='manifests'
+        gitdir='/path/to/test/.repo/manifests/.git'
+        objdir='/path/to/test/.repo/manifests/.git'
+      worktree='/path/to/test/.repo/manifests'
+        remote=RemoteSpec('origin')
+       relpath='.repo/manifests'
+  revisionExpr='refs/heads/master'
+    revisionId=None
+        groups=None
+  """
   def __init__(self, manifest, name, gitdir, worktree):
     Project.__init__(self,
                      manifest=manifest,
@@ -3233,7 +3263,28 @@ class MetaProject(Project):
                      revisionId=None,
                      groups=None)
 
+  """
+  准备同步所需的merge分支参数
+  """
   def PreSync(self):
+    """
+    .git目录存在的情况下，获取HEAD指向分支的merge设置。
+    以'.repo/repo'库为例:
+    $ git symbolic-ref HEAD
+    refs/heads/default
+    $ cat .git/config
+    ...
+    [remote "origin"]
+            url = https://gerrit.googlesource.com/git-repo
+            fetch = +refs/heads/*:refs/remotes/origin/*
+    [branch "default"]
+            remote = origin
+            merge = refs/heads/stable
+
+    通过'git symbolic-ref HEAD'操作得知HEAD指向'refs/heads/default'分支。
+    所以这里获取的 merge = 'refs/heads/stable'
+    因此：revisionExpr = 'refs/heads/stable'
+    """
     if self.Exists:
       cb = self.CurrentBranch
       if cb:
@@ -3252,11 +3303,20 @@ class MetaProject(Project):
     self.Sync_LocalHalf(syncbuf)
     syncbuf.Finish()
 
+    """
+    执行命令：'git update-ref -d refs/heads/default'
+    删除'refs/heads/default'引用。
+    """
     return GitCommand(self,
                       ['update-ref', '-d', 'refs/heads/default'],
                       capture_stdout=True,
                       capture_stderr=True).Wait() == 0
 
+  """
+  返回'.git/FETCH_HEAD'文件的时间戳
+
+  每次执行'git fetch'操作后会更新'.git/FETCH_HEAD'文件，因此返回其时间戳作为最后的更新时间。
+  """
   @property
   def LastFetch(self):
     try:
