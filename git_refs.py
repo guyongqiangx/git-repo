@@ -29,6 +29,15 @@ R_M     = 'refs/remotes/m/'
 """
 class GitRefs(object):
   def __init__(self, gitdir):
+    """
+    _gitdir: 指向'.git'目录
+    _phyref: 基于分支引用和commit id键值对的字典
+             如: _phyref['refs/remotes/origin/master'] = 'c00d28...15'
+    _symref: 基于分支引用间的键值对字典
+             如：_symref[HEAD] = 'refs/heads/stable'
+     _mtime: 某个分支引用文件的更新时间
+             如：_mtime['refs/remotes/origin/master'] = os.path.getmtime('.git/refs/remotes/origin/master')
+    """
     self._gitdir = gitdir
     self._phyref = None
     self._symref = None
