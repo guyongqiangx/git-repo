@@ -730,6 +730,11 @@ class Project(object):
     self.config = GitConfig.ForRepository(gitdir=self.gitdir,
                                           defaults=self.manifest.globalConfig)
 
+    """
+    对每一个gitdir：
+    - 初始化3个可操作的Git库对象(work_git, bare_git和bare_objdir)，用于操作其引用和各种属性。
+    - 初始化bare_ref用于操作.git目录下的所有引用
+    """
     if self.worktree:
       self.work_git = self._GitGetByExec(self, bare=False, gitdir=gitdir)
     else:
@@ -1179,7 +1184,9 @@ class Project(object):
 
 
 # Sync ##
-
+  """
+  解包tarpath指定的文件到path目录下，如果path=None，则为当前目录
+  """
   def _ExtractArchive(self, tarpath, path=None):
     """Extract the given tar on its current location
 
@@ -1316,6 +1323,9 @@ class Project(object):
       raise ManifestInvalidRevisionError('revision %s in %s not found' %
                                          (self.revisionExpr, self.name))
 
+  """
+  获取revisionExpr对应的完整的提交id
+  """
   def GetRevisionId(self, all_refs=None):
     if self.revisionId:
       return self.revisionId
@@ -1326,6 +1336,10 @@ class Project(object):
     if all_refs is not None and rev in all_refs:
       return all_refs[rev]
 
+    """
+    执行：'git rev-parse --verify rev^0'
+    获取完整的提交id
+    """
     try:
       return self.bare_git.rev_parse('--verify', '%s^0' % rev)
     except GitError:
@@ -1527,6 +1541,8 @@ class Project(object):
 
 # Branch Management ##
 
+  """
+  """
   def StartBranch(self, name, branch_merge=''):
     """Create a new branch off the manifest's revision.
     """
@@ -1585,6 +1601,10 @@ class Project(object):
           True if the checkout succeeded; False if it didn't; None if the branch
           didn't exist.
     """
+    """
+    构造rev，如：'refs/heads/name'
+    提取head，如: 'refs/heads/name'或'676ed5ff9129f153bc3efb9b4bc98b1097f4db1f' (头指针分离)
+    """
     rev = R_HEADS + name
     head = self.work_git.GetHead()
     if head == rev:
@@ -1614,6 +1634,9 @@ class Project(object):
               'ref: %s%s\n' % (R_HEADS, name))
       return True
 
+    """
+    命令: 'git checkout name --'
+    """
     return GitCommand(self,
                       ['checkout', name, '--'],
                       capture_stdout=True,
@@ -1628,6 +1651,12 @@ class Project(object):
     Returns:
       True if the abandon succeeded; False if it didn't; None if the branch
       didn't exist.
+    """
+    """
+    构造rev，如：'refs/heads/name'，通过判断ref是否在bare_ref.all中来确保ref已经存在。
+    注：bare_ref.all包含了'.git/'目录下所有的引用。
+
+    提取head，如: 'refs/heads/name'或'676ed5ff9129f153bc3efb9b4bc98b1097f4db1f' (头指针分离)
     """
     rev = R_HEADS + name
     all_refs = self.bare_ref.all
@@ -1648,7 +1677,9 @@ class Project(object):
                 '%s\n' % revid)
       else:
         self._Checkout(revid, quiet=True)
-
+    """
+    命令: 'git branch -D name'
+    """
     return GitCommand(self,
                       ['branch', '-D', name],
                       capture_stdout=True,
@@ -1905,8 +1936,13 @@ class Project(object):
   def _FetchArchive(self, tarpath, cwd=None):
     """
     命令：'git archive -v -o tarpath --remote=remote.url --prefix=relpath/ revisionExpr'
+             '-o <file>': 将archive的结果写入到<file>而不是stdout
+    '--prefix=<prefix>/': 在archive的结果文件中附加'<prefix>/'路径
+       '--remote=<repo>': 从<repo>指定的远端库进行archive操作，而不是本地库
 
-    这里的remote.url不支持http://或https://
+    这里的remote.url不支持http://或https://格式，而是：
+    'git archive --remote=origin v1.0'
+    'git archive --remote=origin v1.0:Documentation'
 
     以本地'/public/test/git-repo'为例，如下操作：
     $ git archive -v -o git-repo.tar --remote=file:///public/test/git-repo --prefix=google/ stable
@@ -2653,6 +2689,20 @@ class Project(object):
                                     pretty_format=pretty_format)
     return logs
 
+  """
+  建立可操作的Git库对象，包括各种引用操作和属性读取操作
+
+  操作包括：
+  .LsOthers()
+  .DiffZ(...)
+  .GetHead()
+  .SetHead(ref)
+  .DetachHead(new)
+  .UpdateRef(name, new)
+  .DeleteRef(name)
+  .rev_list(...)
+  __getattr__(name)
+  """
   class _GitGetByExec(object):
 
     def __init__(self, project, bare, gitdir):
@@ -2661,6 +2711,9 @@ class Project(object):
       self._gitdir = gitdir
 
     def LsOthers(self):
+      """
+      命令: 'git ls-files -z --others --exclude-standard'
+      """
       p = GitCommand(self._project,
                      ['ls-files',
                       '-z',
@@ -2728,7 +2781,33 @@ class Project(object):
       finally:
         p.Wait()
 
+    """
+    读取'.git/HEAD'文件，并返回其指向的分支或提交id
+    例如：返回'refs/heads/stable'或'fa2ff85933d90139bf0340bd6dda4331effbe4ee'
+    """
     def GetHead(self):
+      """
+      构造HEAD文件的路径: '.git/HEAD'
+
+      然后读取HEAD文件的内容，有两种情况：
+
+      1. 指向某个分支引用
+      $ cat .git/HEAD
+      ref: refs/heads/stable
+      返回其除去'ref :'的部分，即'refs/heads/stable'
+
+      2. 头指针分离状态下指向某个具体的提交对象
+      $ git update-ref --no-deref HEAD fa2ff85
+      $ git status
+      HEAD detached from 2ea37bc
+      nothing to commit, working directory clean
+      $ cat .git/HEAD
+      fa2ff85933d90139bf0340bd6dda4331effbe4ee
+
+      上面操作中，使用'git update-ref --no-deref HEAD fa2ff85'使头指针分离，此时HEAD指向某个特定的提交
+
+      另：分离头指针的情况下，可以通过'git symbolic-ref HEAD refs/heads/comments'恢复头指针指向的分支。
+      """
       if self._bare:
         path = os.path.join(self._project.gitdir, HEAD)
       else:
