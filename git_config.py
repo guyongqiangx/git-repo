@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2008 The Android Open Source Project
 #
@@ -57,9 +58,17 @@ ID_RE = re.compile(r'^[0-9a-f]{40}$')
 
 REVIEW_CACHE = dict()
 
+"""
+判断rev是否满足40位commit id的格式
+
+如：'34acdd253439448b6c08c3abfc5e7b8bd03f383f'
+"""
 def IsId(rev):
   return ID_RE.match(rev)
 
+"""
+
+"""
 def _key(name):
   parts = name.split('.')
   if len(parts) < 2:
@@ -71,17 +80,26 @@ def _key(name):
 class GitConfig(object):
   _ForUser = None
 
+  """
+  通过GitConfig.ForUser()调用，返回用户级别'~/.gitconfig'的配置类
+  """
   @classmethod
   def ForUser(cls):
     if cls._ForUser is None:
       cls._ForUser = cls(configfile = os.path.expanduser('~/.gitconfig'))
     return cls._ForUser
 
+  """
+  通过GitConfig.ForRepository()调用，返回仓库级别'.git/config'的配置类
+  """
   @classmethod
   def ForRepository(cls, gitdir, defaults=None):
     return cls(configfile = os.path.join(gitdir, 'config'),
                defaults = defaults)
 
+  """
+  使用configfile指定的文件实例化GitConfig的类对象
+  """
   def __init__(self, configfile, defaults=None, jsonFile=None):
     self.file = configfile
     self.defaults = defaults
@@ -90,6 +108,9 @@ class GitConfig(object):
     self._remotes = {}
     self._branches = {}
 
+    """
+    默认设置 _json = '.repo/repo/.git/.repo_config.json'
+    """
     self._json = jsonFile
     if self._json is None:
       self._json = os.path.join(
@@ -105,6 +126,9 @@ class GitConfig(object):
       return self.defaults.Has(name, include_defaults = True)
     return False
 
+  """
+  返回name项的bool值, true/yes: True, false/no: False
+  """
   def GetBoolean(self, name):
     """Returns a boolean from the configuration file.
        None : The value was not defined, or is not a boolean.
@@ -121,6 +145,9 @@ class GitConfig(object):
       return False
     return None
 
+  """
+
+  """
   def GetString(self, name, all_keys=False):
     """Get the first value for a key, or None if it is not defined.
 
@@ -223,8 +250,17 @@ class GitConfig(object):
           return new_url + url[len(old_url):]
     return url
 
+  """
+  返回'.git/.repo_config.json'中的所有sections
+
+  访问_sections属性会加载'.git/.repo_config.json'中的键值对数据的section部分到_section_dict字典成员中，并返回
+  """
   @property
   def _sections(self):
+    """
+    访问_section_dict字典成员
+    如果为空，则遍历_cache字典成员的所有key，并使用'.'进行分割。
+    """
     d = self._section_dict
     if d is None:
       d = {}
@@ -242,12 +278,23 @@ class GitConfig(object):
         self._section_dict = d
     return d
 
+  """
+  返回'.git/.repo_config.json'中的所有键值对。
+
+  访问_cache属性会加载'.git/.repo_config.json'中的键值对数据，存放到_cache_dict字典成员中，并返回
+  """
   @property
   def _cache(self):
     if self._cache_dict is None:
       self._cache_dict = self._Read()
     return self._cache_dict
 
+  """
+  读取'.git/.repo_config.json'中的键值对数据
+
+  如果没有读取到'.git/.repo_config.json'文件，
+  则加载'configfile'中的数据，并保存到'.git/.repo_config.json'文件中
+  """
   def _Read(self):
     d = self._ReadJson()
     if d is None:
@@ -255,7 +302,32 @@ class GitConfig(object):
       self._SaveJson(d)
     return d
 
+  """
+  加载'.git/.repo_config.json'中的键值对数据
+  """
   def _ReadJson(self):
+    """
+    比较'.git/.repo_config.json'和'.git/config'文件的时间戳,
+    如果_json比.git/config文件旧，则发生了错误，因为每次同步都会更新_json文件，肯定比'.git/config'文件新
+
+    加载_json文件中的键值对，如：
+    .repo/repo$ cat .git/.repo_config.json
+    {
+      ...
+      "remote.origin.url": [
+        "https://gerrit.googlesource.com/git-repo"
+      ],
+      "branch.default.merge": [
+        "refs/heads/stable"
+      ],
+      "branch.default.remote": [
+        "origin"
+      ],
+      "remote.origin.fetch": [
+        "+refs/heads/*:refs/remotes/origin/*"
+      ]
+    }
+    """
     try:
       if os.path.getmtime(self._json) \
       <= os.path.getmtime(self.file):
@@ -274,6 +346,9 @@ class GitConfig(object):
       os.remove(self._json)
       return None
 
+  """
+  保存cache中的数据到'.git/.repo_config.json'文件中
+  """
   def _SaveJson(self, cache):
     try:
       fd = open(self._json, 'w')
@@ -285,6 +360,11 @@ class GitConfig(object):
       if os.path.exists(self._json):
         os.remove(self._json)
 
+  """
+  读取config文件的键值对，并以字典的方式返回
+
+  具体是读取用户级别的'~/.gitconfig'还是仓库级别的'.git/config'，则由初始化时指定的configfile决定。
+  """
   def _ReadGit(self):
     """
     Read configuration data from git.
@@ -293,6 +373,49 @@ class GitConfig(object):
 
     """
     c = {}
+    """
+    _do调用会执行命令：'git config --file file --null --list'
+    用于列举'.git/config'或'~/.gitconfig'中的设置，如：
+    $ cat .git/config
+    [core]
+      repositoryformatversion = 0
+      filemode = true
+      bare = false
+      logallrefupdates = true
+    [remote "origin"]
+      url = https://gerrit.googlesource.com/git-repo
+      fetch = +refs/heads/*:refs/remotes/origin/*
+    [branch "default"]
+      remote = origin
+      merge = refs/heads/stable
+    $ git config --file .git/config --null --list | hexdump -Cv
+    00000000  63 6f 72 65 2e 72 65 70  6f 73 69 74 6f 72 79 66  |core.repositoryf|
+    00000010  6f 72 6d 61 74 76 65 72  73 69 6f 6e 0a 30 00 63  |ormatversion.0.c|
+    00000020  6f 72 65 2e 66 69 6c 65  6d 6f 64 65 0a 74 72 75  |ore.filemode.tru|
+    00000030  65 00 63 6f 72 65 2e 62  61 72 65 0a 66 61 6c 73  |e.core.bare.fals|
+    00000040  65 00 63 6f 72 65 2e 6c  6f 67 61 6c 6c 72 65 66  |e.core.logallref|
+    00000050  75 70 64 61 74 65 73 0a  74 72 75 65 00 72 65 6d  |updates.true.rem|
+    00000060  6f 74 65 2e 6f 72 69 67  69 6e 2e 75 72 6c 0a 68  |ote.origin.url.h|
+    00000070  74 74 70 73 3a 2f 2f 67  65 72 72 69 74 2e 67 6f  |ttps://gerrit.go|
+    00000080  6f 67 6c 65 73 6f 75 72  63 65 2e 63 6f 6d 2f 67  |oglesource.com/g|
+    00000090  69 74 2d 72 65 70 6f 00  72 65 6d 6f 74 65 2e 6f  |it-repo.remote.o|
+    000000a0  72 69 67 69 6e 2e 66 65  74 63 68 0a 2b 72 65 66  |rigin.fetch.+ref|
+    000000b0  73 2f 68 65 61 64 73 2f  2a 3a 72 65 66 73 2f 72  |s/heads/*:refs/r|
+    000000c0  65 6d 6f 74 65 73 2f 6f  72 69 67 69 6e 2f 2a 00  |emotes/origin/*.|
+    000000d0  62 72 61 6e 63 68 2e 64  65 66 61 75 6c 74 2e 72  |branch.default.r|
+    000000e0  65 6d 6f 74 65 0a 6f 72  69 67 69 6e 00 62 72 61  |emote.origin.bra|
+    000000f0  6e 63 68 2e 64 65 66 61  75 6c 74 2e 6d 65 72 67  |nch.default.merg|
+    00000100  65 0a 72 65 66 73 2f 68  65 61 64 73 2f 73 74 61  |e.refs/heads/sta|
+    00000110  62 6c 65 00                                       |ble.|
+    00000114
+
+    这里由于使用'--null'选项，所以得到的键值对是使用'\0'来分割的，文本模式无法识别，只能通过十六进制查看。
+
+    - 使用'\0'(即null)来分割两项间的设置
+    - 使用'\n'(即0x0a)来分割每一项的键值对(key, value)
+
+    最后将分割得到的键值对(key, value)存放到c列表中。
+    """
     d = self._do('--null', '--list')
     if d is None:
       return c
@@ -311,7 +434,19 @@ class GitConfig(object):
 
     return c
 
+  """
+  保存args中的设置到用户级别或仓库级别的config文件中。
+  """
   def _do(self, *args):
+    """
+    构造命令：'git config --file file key value'
+
+    这里的file可能是用户级别的'~/.gitconfig'或仓库级别的'.git/config':
+
+    如：
+    'git config --file ~/.gitconfig user.name guyongqiangx'
+    'git config --file .git/config user.name guyongqiangx'
+    """
     command = ['config', '--file', self.file]
     command.extend(args)
 
