@@ -314,7 +314,7 @@ class GitConfig(object):
     return r
 
   """
-  返回'branch.$name.*'配置对象
+  返回'branch.$name.*'配置对象，如：GetBranch("default")
 
   $ cat .git/.repo_config.json
   {
@@ -840,6 +840,33 @@ def _preconnect(url):
 
   return False
 
+"""
+一个Remote对象代表config文件中的一个remote设置, 如：
+$ cat .git/config
+...
+[remote "origin"]
+  url = https://gerrit.googlesource.com/git-repo
+  fetch = +refs/heads/*:refs/remotes/origin/*
+...
+
+例如：aosp下的device/common:
+aosp/.repo/projects/device/common.git$ cat config
+...
+[remote "aosp"]
+  url = https://aosp.tuna.tsinghua.edu.cn/device/common
+  projectname = device/common
+  fetch = +refs/heads/*:refs/remotes/aosp/*
+
+一个Remote对象有8个属性，分别为：
+    _config: 包含当前remote设置的config对象
+       name: remote的名称
+        url: remote的url属性
+    pushUrl: remote的pushUrl属性
+     review:
+projectname:
+      fetch:
+_review_url:
+"""
 class Remote(object):
   """Configuration options related to a remote.
   """
@@ -987,6 +1014,9 @@ class Remote(object):
       dst = 'refs/remotes/%s/*' % self.name
     self.fetch = [RefSpec(True, 'refs/heads/*', dst)]
 
+  """
+  将remote的设置保存到当前config对应的文件中
+  """
   def Save(self):
     """Save this remote to the configuration.
     """
@@ -999,15 +1029,37 @@ class Remote(object):
     self._Set('projectname', self.projectname)
     self._Set('fetch', list(map(str, self.fetch)))
 
+  """
+  使用value设置当前config指定remote的key项
+  remote.$name.$key = $value
+  """
   def _Set(self, key, value):
     key = 'remote.%s.%s' % (self.name, key)
     return self._config.SetString(key, value)
 
+  """
+  获取当前config指定remote的key设置
+  remote.$name.$key
+  """
   def _Get(self, key, all_keys=False):
     key = 'remote.%s.%s' % (self.name, key)
     return self._config.GetString(key, all_keys = all_keys)
 
+"""
+一个Branch对象代表config文件中的一个branch分支, 如：
+$ cat .git/config
+...
+[branch "default"]
+  remote = origin
+  merge = refs/heads/stable
+...
 
+一个Branch对象有4个属性，分别为：
+_config: 包含当前branch的config对象
+   name: branch的名字
+  merge: branch的merge属性
+ remote: branch的remote属性
+"""
 class Branch(object):
   """Configuration options related to a single branch.
   """
@@ -1030,6 +1082,9 @@ class Branch(object):
       return self.remote.ToLocal(self.merge)
     return None
 
+  """
+  将branch的设置(remote和merge)保存到当前config对应的文件中
+  """
   def Save(self):
     """Save this branch back into the configuration.
     """
@@ -1051,10 +1106,18 @@ class Branch(object):
       finally:
         fd.close()
 
+  """
+  使用value设置当前config指定branch的key项
+  branch.$name.$key = $value
+  """
   def _Set(self, key, value):
     key = 'branch.%s.%s' % (self.name, key)
     return self._config.SetString(key, value)
 
+  """
+  获取当前config指定branch的key设置
+  branch.$name.$key
+  """
   def _Get(self, key, all_keys=False):
     key = 'branch.%s.%s' % (self.name, key)
     return self._config.GetString(key, all_keys = all_keys)
