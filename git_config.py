@@ -67,9 +67,24 @@ def IsId(rev):
   return ID_RE.match(rev)
 
 """
+name为以'.'连接的字符串，_key(name)操作返回字符串首尾节的小写形式
 
+例如：_key('Remote.Google.URL')='remote.Google.url'
+
+类似以下的设置：
+.repo/repo$ cat .git/.repo_config.json
+{
+  ...
+  "Remote.Google.URL": [
+    "https://gerrit.googlesource.com/git-repo"
+  ],
+  ...
+}
 """
 def _key(name):
+  """
+  对name进行分割，然后将开始和结尾的部分转换为小写，并重新连接起来
+  """
   parts = name.split('.')
   if len(parts) < 2:
     return name.lower()
@@ -81,7 +96,7 @@ class GitConfig(object):
   _ForUser = None
 
   """
-  通过GitConfig.ForUser()调用，返回用户级别'~/.gitconfig'的配置类
+  通过GitConfig.ForUser()调用，返回用户级别'~/.gitconfig'的配置对象
   """
   @classmethod
   def ForUser(cls):
@@ -90,7 +105,7 @@ class GitConfig(object):
     return cls._ForUser
 
   """
-  通过GitConfig.ForRepository()调用，返回仓库级别'.git/config'的配置类
+  通过GitConfig.ForRepository()调用，返回仓库级别'.git/config'的配置对象
   """
   @classmethod
   def ForRepository(cls, gitdir, defaults=None):
@@ -101,6 +116,13 @@ class GitConfig(object):
   使用configfile指定的文件实例化GitConfig的类对象
   """
   def __init__(self, configfile, defaults=None, jsonFile=None):
+    """
+             .file 指向具体的config文件，如'.git/config'或'~/.gitconfig'
+      ._cache_dict 访问'_cache'属性时，会保存从'.git/.repo_config.json'中加载的键值对到'_cache_dict_'
+    ._section_dict
+         ._remotes
+        ._branches
+    """
     self.file = configfile
     self.defaults = defaults
     self._cache_dict = None
@@ -117,8 +139,16 @@ class GitConfig(object):
         os.path.dirname(self.file),
         '.repo_' + os.path.basename(self.file) + '.json')
 
+  """
+  判断name对应项是否存在
+
+  调用示例：config.Has('user.name') 或 config.Has('user.email')
+  """
   def Has(self, name, include_defaults = True):
     """Return true if this configuration file has the key.
+    """
+    """
+    调用_key(name)对name进行处理，并检查结果是否位于_cache中
     """
     if _key(name) in self._cache:
       return True
@@ -146,7 +176,7 @@ class GitConfig(object):
     return None
 
   """
-
+  返回name项的值，如果all_keys=True，则返回所有的值，默认返回第一项值。
   """
   def GetString(self, name, all_keys=False):
     """Get the first value for a key, or None if it is not defined.
@@ -172,6 +202,9 @@ class GitConfig(object):
       r.extend(self.defaults.GetString(name, all_keys = True))
     return r
 
+  """
+  使用value更新name项对应的值, 如果value=None，则删除name项
+  """
   def SetString(self, name, value):
     """Set the value(s) for a key.
        Only this configuration file is modified.
@@ -181,6 +214,50 @@ class GitConfig(object):
     """
     key = _key(name)
 
+    """
+    先检查name项是否已经设置，如果有设置，将其原来的值保存在old中
+
+    如果value=None，则删除name项, 并执行'git config --file file --unset-all name'命令
+
+    如果value不为None，则使用value的值更新name项, 并执行以下命令更新(如果value是多项，则逐一添加每一项)：
+    'git config --file file --replace-all name value[0]'
+    'git config --file file --add name value[1]'
+    'git config --file file --add name value[...]'
+    'git config --file file --add name value[i]'
+
+    其中'--replace-all'选项会替换所有的多行设置，默认只替换一行。
+
+    以下是以url.xxx.insteadof配置的一个示例：
+    $ cat .git/config
+    ...
+    [branch "default"]
+    remote = origin
+    merge = refs/heads/stable
+    $ git config  url.http://localhost.insteadof https://gerrit.googlesource.com/git-repo
+    $ git config  --add url.http://localhost.insteadof https://github.com/guyongqiangx/git-repo
+    $ git config  --add url.http://localhost.insteadof https://aosp.tuna.tsinghua.edu.cn/git-repo
+    $ cat .git/config
+    ...
+    [branch "default"]
+      remote = origin
+      merge = refs/heads/stable
+    [url "http://localhost"]
+      insteadof = https://gerrit.googlesource.com/git-repo
+      insteadof = https://github.com/guyongqiangx/git-repo
+      insteadof = https://aosp.tuna.tsinghua.edu.cn/git-repo
+    $ git config  url.http://localhost.insteadof http://127.0.0.1/git-repo
+    warning: url.http://localhost.insteadof has multiple values
+    error: cannot overwrite multiple values with a single value
+           Use a regexp, --add or --replace-all to change url.http://localhost.insteadof.
+    $ git config  --replace-all url.http://localhost.insteadof http://127.0.0.1/git-repo
+    $ cat .git/config
+    ...
+    [branch "default"]
+      remote = origin
+      merge = refs/heads/stable
+    [url "http://localhost"]
+      insteadof = http://127.0.0.1/git-repo
+    """
     try:
       old = self._cache[key]
     except KeyError:
@@ -192,6 +269,9 @@ class GitConfig(object):
         self._do('--unset-all', name)
 
     elif isinstance(value, list):
+      """
+      对value为list的情况，说明value包含0个或多个值，逐一使用valued的值进行更新
+      """
       if len(value) == 0:
         self.SetString(name, None)
 
@@ -208,6 +288,21 @@ class GitConfig(object):
       self._cache[key] = [value]
       self._do('--replace-all', name, value)
 
+  """
+  返回'remote.$name.*'配置对象
+
+  $ cat .git/.repo_config.json
+  {
+    ...
+    "remote.origin.url": [
+      "https://gerrit.googlesource.com/git-repo"
+    ],
+    ...
+    "remote.origin.fetch": [
+      "+refs/heads/*:refs/remotes/origin/*"
+    ]
+  }
+  """
   def GetRemote(self, name):
     """Get the remote.$name.* configuration values as an object.
     """
@@ -218,6 +313,21 @@ class GitConfig(object):
       self._remotes[r.name] = r
     return r
 
+  """
+  返回'branch.$name.*'配置对象
+
+  $ cat .git/.repo_config.json
+  {
+    ...
+    "branch.default.merge": [
+      "refs/heads/stable"
+    ],
+    "branch.default.remote": [
+      "origin"
+    ],
+    ...
+  }
+  """
   def GetBranch(self, name):
     """Get the branch.$name.* configuration values as an object.
     """
@@ -241,6 +351,8 @@ class GitConfig(object):
     except KeyError:
       return False
 
+  """
+  """
   def UrlInsteadOf(self, url):
     """Resolve any url.*.insteadof references.
     """
@@ -279,7 +391,7 @@ class GitConfig(object):
     return d
 
   """
-  返回'.git/.repo_config.json'中的所有键值对。
+  '._cache'属性返回'.git/.repo_config.json'中的所有键值对。
 
   访问_cache属性会加载'.git/.repo_config.json'中的键值对数据，存放到_cache_dict字典成员中，并返回
   """
@@ -478,12 +590,26 @@ class RefSpec(object):
       forced = False
     return cls(forced, lhs, rhs)
 
+  """
+  构造函数
+
+  例如：RefSpec(True, 'refs/heads/*', dst)
+  """
   def __init__(self, forced, lhs, rhs):
     self.forced = forced
     self.src = lhs
     self.dst = rhs
 
+  """
+  判断rev是否同source匹配
+  """
   def SourceMatches(self, rev):
+    """
+    Match的条件：
+    1. src和rev相同
+    2. 或src以'/*'结尾且rev包含src除'*'外的字符串
+       如src='refs/heads/*', rev='refs/heads/master'
+    """
     if self.src:
       if rev == self.src:
         return True
@@ -491,7 +617,16 @@ class RefSpec(object):
         return True
     return False
 
+  """
+  判断ref是否同dst匹配
+  """
   def DestMatches(self, ref):
+    """
+    Match的条件:
+    1. ref和dst相同
+    2. 或dst以'/*'结尾且ref包含dst除'*'外的字符串
+       如dst='refs/heads/*', ref='refs/heads/master'
+    """
     if self.dst:
       if ref == self.dst:
         return True
@@ -504,6 +639,11 @@ class RefSpec(object):
       return self.dst[:-1] + rev[len(self.src) - 1:]
     return self.dst
 
+  """
+  转换为字符串'+src:dst'的格式
+
+  如：'+refs/heads/*:refs/remotes/origin/*'
+  """
   def __str__(self):
     s = ''
     if self.forced:
@@ -714,12 +854,29 @@ class Remote(object):
                       self._Get('fetch', all_keys=True)))
     self._review_url = None
 
+  """
+  返回url的insteadOf地址
+  """
   def _InsteadOf(self):
+    """
+    检查用户级配置文件'~/.gitconfig'的'url'节设置，并解析'.insteadOf'的地址列表
+    """
     globCfg = GitConfig.ForUser()
     urlList = globCfg.GetSubSections('url')
     longest = ""
     longestUrl = ""
 
+    """
+    逐条检查insteadOf设置，如：
+    $ cat ~/.gitconfig
+    ...
+    [url "http://localhost"]
+      insteadof = https://gerrit.googlesource.com/git-repo
+      insteadof = https://github.com/guyongqiangx/git-repo
+      insteadof = https://aosp.tuna.tsinghua.edu.cn/git-repo
+
+    insteadOfList包含所有的'insteadof'结果。
+    """
     for url in urlList:
       key = "url." + url + ".insteadOf"
       insteadOfList = globCfg.GetString(key, all_keys=True)
