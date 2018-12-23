@@ -352,9 +352,38 @@ class GitConfig(object):
       return False
 
   """
+  检查配置文件中'url.*.insteadof'选项，并对地址进行转换
+
+  如：
+  'https://gerrit.googlesource.com/git-repo' 通过UrlInsteadOf()被转换为：
+  --> 'http://localhost/mirror/git-repo'
   """
   def UrlInsteadOf(self, url):
     """Resolve any url.*.insteadof references.
+    """
+    """
+    config文件中 'url.*.insteadof' 节的参考示例：
+    $ cat .git/config
+    ...
+    [url "http://localhost/mirror"]
+      insteadof = https://gerrit.googlesource.com
+      insteadof = https://github.com/guyongqiangx
+      insteadof = https://aosp.tuna.tsinghua.edu.cn
+    ...
+
+    这里解析的结果：
+    new_url = 'http://localhost/mirror'
+    old_url = [ 'https://gerrit.googlesource.com',
+                'https://github.com/guyongqiangx',
+                'https://aosp.tuna.tsinghua.edu.cn' ]
+
+    如果传入的url以old_url列表中的某个地址开始，则使用new_url对old_url这部分进行替换，如：
+    url = 'https://gerrit.googlesource.com/git-repo'
+    显然，url地址以old_url列表的第一项开始，所以需要用new_url进行替换。
+
+    因此，地址：
+    'https://gerrit.googlesource.com/git-repo' 通过UrlInsteadOf()被转换为：
+    --> 'http://localhost/mirror/git-repo'
     """
     for new_url in self.GetSubSections('url'):
       for old_url in self.GetString('url.%s.insteadof' % new_url, True):
