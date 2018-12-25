@@ -117,7 +117,10 @@ class GitConfig(object):
   """
   def __init__(self, configfile, defaults=None, jsonFile=None):
     """
-             .file 指向具体的config文件，如'.git/config'或'~/.gitconfig'
+             .file 指向具体的config文件，如'.git/config'或'~/.gitconfig'，对于globalConfig有configfile='~/.gitconfig'
+         .defaults 指向默认的config文件，如：
+                   project类初始化时使用ForRepository(gitdir=self.gitdir, defaults=self.manifest.globalConfig)来进行初始化。
+                   即 manifest对应的globalConfig，实际上是'~/.gitconfig'
       ._cache_dict 访问'_cache'属性时，会保存从'.git/.repo_config.json'中加载的键值对到'_cache_dict_'
     ._section_dict
          ._remotes
