@@ -213,6 +213,9 @@ class XmlManifest(object):
     """
     self._Unload()
 
+  """
+  传入名为name的xml文件，并基于该文件解析manifest信息并加载覆盖原有信息。
+  """
   def Override(self, name):
     """Use a different manifest, just for the current instantiation.
     """
@@ -234,6 +237,9 @@ class XmlManifest(object):
     finally:
       self.manifestFile = old
 
+  """
+  先删除'.repo/manifest.xml'，然后将'.repo/manifests/$name'文件链接到'.repo/manifest.xml'。
+  """
   def Link(self, name):
     """Update the repo metadata to use a different manifest.
     """
@@ -244,7 +250,7 @@ class XmlManifest(object):
       关于：os.path.lexists(path)
         Return True if path refers to an existing path. Returns True for broken symbolic links.
 
-      这里不论manifestFile是真实的文件还是链接文件，都先删除，然后将'manifests/name'文件链接到manifestFile。
+      这里不论'.repo/manifest.xml'是真实的文件还是链接文件，都先删除，然后将'manifests/$name'文件链接到'.repo/manifest.xml'。
 
       类似以下操作：
       $ rm -rf '/path/to/test/.repo/manifest.xml'
@@ -495,7 +501,7 @@ class XmlManifest(object):
   """
   在克隆的清单库中，当前分支名称始终为'default', _Load操作找到当前分支对应的原始分支用于设置branch成员。
 
-  所以branch成员保存了正真的分支名称。
+  所以branch成员保存了真正的分支名称。
 
   同时，加载
   - 远程 manifest.xml以及
@@ -534,6 +540,9 @@ class XmlManifest(object):
 
       """
       加载manifestFile ='/path/to/test/.repo/manifest.xml'中的nodes节点。
+
+      实际上在Override(name)操作时，manifestFile可能指向具体名为name的manifest文件，如'manifests/rpi3.xml',
+      加载完节点后，重新将manifestFile指回原来默认的xml文件，即'.repo/manifest.xml'
       """
       nodes = []
       nodes.append(self._ParseManifestXml(self.manifestFile,
