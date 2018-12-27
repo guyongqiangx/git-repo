@@ -303,8 +303,8 @@ to update the working directory files.
       m._InitGitDir(mirror_git=mirrored_manifest_git)
 
       """
-      根据'-b REVISION, --manifest-branch=REVISION'选项指定的manifest库的分支设置revisionExpr，
-      默认为'refs/heads/master'分支。
+      如果'repo init'带有'-b REVISION, --manifest-branch=REVISION'参数，则根据该参数设置manifest库的分支。
+      如果不带有分支参数，则默认为'refs/heads/master'
       """
       if opt.manifest_branch:
         m.revisionExpr = opt.manifest_branch
@@ -316,6 +316,9 @@ to update the working directory files.
       else:
         m.PreSync()
 
+    """
+    如果'repo init'带有'--manifest-url=url'参数，则使用url参数替代从'.repo/manifest/.git/config'文件加载的manifest源地址。
+    """
     if opt.manifest_url:
       r = m.GetRemote(m.remote.name)
       r.url = opt.manifest_url
@@ -350,9 +353,17 @@ to update the working directory files.
       groupstr = None
     m.config.SetString('manifest.groups', groupstr)
 
+    """
+    如果'repo init'带有'--reference=DIR'参数，则向manifest的config文件写入'repo.reference=DIR'，相当于命令：
+    'git config --file .repo/manifests/.git/config repo.reference DIR'
+    """
     if opt.reference:
       m.config.SetString('repo.reference', opt.reference)
 
+    """
+    如果'repo init'带有'--archive'参数，则向manifest的config文件写入'repo.archive=true'，相当于命令：
+    'git config --file .repo/manifests/.git/config repo.archive true'
+    """
     if opt.archive:
       if is_new:
         m.config.SetString('repo.archive', 'true')
@@ -363,6 +374,12 @@ to update the working directory files.
               'in another location.', file=sys.stderr)
         sys.exit(1)
 
+    """
+    如果'repo init'带有'--mirror'参数，则向manifest的config文件写入'repo.mirror=true'，相当于命令：
+    'git config --file .repo/manifests/.git/config repo.mirror true'
+
+    特别注意的是，'--mirror'参数只能在第一次运行仓库初始化命令时执行。
+    """
     if opt.mirror:
       if is_new:
         m.config.SetString('repo.mirror', 'true')
@@ -373,6 +390,9 @@ to update the working directory files.
               'in another location.', file=sys.stderr)
         sys.exit(1)
 
+    """
+    同步分为两部分：Sync_NetworkHalf和Sync_LocalHarf。
+    """
     if not m.Sync_NetworkHalf(is_new=is_new, quiet=opt.quiet,
         clone_bundle=not opt.no_clone_bundle):
       r = m.GetRemote(m.remote.name)
@@ -384,6 +404,9 @@ to update the working directory files.
         shutil.rmtree(m.gitdir)
       sys.exit(1)
 
+    """
+    如果'repo init'带有'--manifest-branch'参数，则调用MetaBranchSwitch()删除'refs/heads/default'引用。
+    """
     if opt.manifest_branch:
       m.MetaBranchSwitch()
 
@@ -392,7 +415,7 @@ to update the working directory files.
     syncbuf.Finish()
 
     """
-    如果是从0同步一个新库(is_new=True)，或manifest库的当前分支为空，则切换到manifest库的'default'分支上去。
+    如果是同步一个新仓库(is_new=True)，或manifest库的当前分支为空，则切换到manifest库的'default'分支上去。
     如果'default'分支不存在，则会创建一个名为'default'的分支。
     """
     if is_new or m.CurrentBranch is None:
