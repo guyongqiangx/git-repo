@@ -736,6 +736,9 @@ class Project(object):
     """
     对每一个gitdir：
     - 初始化3个可操作的Git库对象(work_git, bare_git和bare_objdir)，用于操作其引用和各种属性。
+      - 3个可操作的Git库对象唯一的差别在于bare属性:
+      - 对于bare库，引用位于当前目录下;
+      - 对于非bare库，引用位于其'.git'目录下
     - 初始化bare_ref用于操作'.git'目录下的所有引用
     """
     if self.worktree:
@@ -757,7 +760,7 @@ class Project(object):
     return self.is_derived
 
   """
-  Exists属性用于指示当前project是否存在
+  指示当前project是否存在
 
   检查gitdir和objdir是否存在，如果二者都存在才确认当前project存在
   """
@@ -765,6 +768,15 @@ class Project(object):
   def Exists(self):
     return os.path.isdir(self.gitdir) and os.path.isdir(self.objdir)
 
+  """
+  返回HEAD引用所在的分支
+
+  HEAD引用有两种情况：
+  1. 指向某个分支引用，如：refs/heads/stable
+  2. 头指针分离状态下指向某个具体的提交对象，如：fa2ff85933d90139bf0340bd6dda4331effbe4ee
+
+  只有第一种情况下，当前库才位于某个具体的分支上('refs/heads/...')；否则在头指针分离的情况下，不位于任何分支之上。
+  """
   @property
   def CurrentBranch(self):
     """Obtain the name of the currently checked out branch.
@@ -776,6 +788,11 @@ class Project(object):
       return b[len(R_HEADS):]
     return None
 
+  """
+  返回当前是否位于Rebase未完成的状态
+
+  通过检查'.git'目录下是否存在名为'rebase-apply'/'rebase-merge'/‘.dotest'文件来指示当前是否位于Rebase未完成的状态
+  """
   def IsRebaseInProgress(self):
     w = self.worktree
     g = os.path.join(w, '.git')
@@ -801,6 +818,9 @@ class Project(object):
   _userident_name = None
   _userident_email = None
 
+  """
+  返回git库的user.name设置
+  """
   @property
   def UserName(self):
     """Obtain the user's personal name.
@@ -809,6 +829,9 @@ class Project(object):
       self._LoadUserIdentity()
     return self._userident_name
 
+  """
+  返回git库的user.email设置
+  """
   @property
   def UserEmail(self):
     """Obtain the user's email address.  This is very likely
@@ -818,7 +841,18 @@ class Project(object):
       self._LoadUserIdentity()
     return self._userident_email
 
+  """
+  返回git变量GIT_COMMITTER_IDENT中的name和email选项设置
+  """
   def _LoadUserIdentity(self):
+    """
+    bare_git.var('GIT_COMMITTER_IDENT')属性访问被'__getattr__'操作转换为执行命令: 'git var GIT_COMMITTER_IDENT'
+    即：
+    $ git var GIT_COMMITTER_IDENT
+    Rocky Gu <rocky.gu@broadcom.com> 1545942352 +0800
+
+    另外可以用’git var -l'列举所有的git变量，包括'.git/config'中的设置。
+    """
     u = self.bare_git.var('GIT_COMMITTER_IDENT')
     m = re.compile("^(.*) <([^>]*)> ").match(u)
     if m:
@@ -828,13 +862,30 @@ class Project(object):
       self._userident_name = ''
       self._userident_email = ''
 
+  """
+  返回'.git/config'中名为name的remote对象
+  如：
+  $ cat .git/config
+  ...
+  [remote "origin"]
+    url = https://gerrit.googlesource.com/git-repo
+    fetch = +refs/heads/*:refs/remotes/origin/*
+  ...
+  """
   def GetRemote(self, name):
     """Get the configuration for a single remote.
     """
     return self.config.GetRemote(name)
 
   """
-  返回'.git/config'中分支name的配置对象
+  返回'.git/config'中名为name的branch对象
+  如：
+  $ cat .git/config
+  ...
+  [branch "default"]
+    remote = origin
+    merge = refs/heads/stable
+  ...
   """
   def GetBranch(self, name):
     """Get the configuration for a single branch.
@@ -2734,7 +2785,7 @@ class Project(object):
     return logs
 
   """
-  建立可操作的Git库对象，包括各种引用操作和属性读取操作
+  建立可操作的Git库对象，包括各种引用和属性读取操作
 
   操作包括：
   .LsOthers()
@@ -3075,7 +3126,13 @@ class Project(object):
       return r
 
     """
-    git_obj.rev_parse('HEAD') --> 'git config HEAD'
+    将属性的获取转换为git命令执行，并返回命令的结果
+
+    如：git_obj.rev_parse('HEAD')
+    转换为命令：'git rev-parse HEAD'
+
+    如：bare_git.var('GIT_COMMITTER_IDENT')
+    转换为命令：'git var GIT_COMMITTER_IDENT'
     """
     def __getattr__(self, name):
       """Allow arbitrary git commands using pythonic syntax.
@@ -3325,9 +3382,10 @@ class MetaProject(Project):
             remote = origin
             merge = refs/heads/stable
 
-    通过'git symbolic-ref HEAD'操作得知HEAD指向'refs/heads/default'分支。
-    所以这里获取的 merge = 'refs/heads/stable'
-    因此：revisionExpr = 'refs/heads/stable'
+    通过'git symbolic-ref HEAD'操作得知HEAD指向'refs/heads/default'分支，其merge属性为'refs/heads/stable'
+    因此这里：
+      revisionExpr = 'refs/heads/stable'
+      revisionId = None
     """
     if self.Exists:
       cb = self.CurrentBranch
