@@ -727,13 +727,16 @@ class Project(object):
     self.copyfiles = []
     self.linkfiles = []
     self.annotations = []
+    """
+    project默认解析当前gitdir对应的仓库级别的config文件，
+    """
     self.config = GitConfig.ForRepository(gitdir=self.gitdir,
                                           defaults=self.manifest.globalConfig)
 
     """
     对每一个gitdir：
     - 初始化3个可操作的Git库对象(work_git, bare_git和bare_objdir)，用于操作其引用和各种属性。
-    - 初始化bare_ref用于操作.git目录下的所有引用
+    - 初始化bare_ref用于操作'.git'目录下的所有引用
     """
     if self.worktree:
       self.work_git = self._GitGetByExec(self, bare=False, gitdir=gitdir)
@@ -753,6 +756,11 @@ class Project(object):
   def Derived(self):
     return self.is_derived
 
+  """
+  Exists属性用于指示当前project是否存在
+
+  检查gitdir和objdir是否存在，如果二者都存在才确认当前project存在
+  """
   @property
   def Exists(self):
     return os.path.isdir(self.gitdir) and os.path.isdir(self.objdir)
@@ -825,13 +833,28 @@ class Project(object):
     """
     return self.config.GetRemote(name)
 
+  """
+  返回'.git/config'中分支name的配置对象
+  """
   def GetBranch(self, name):
     """Get the configuration for a single branch.
     """
     return self.config.GetBranch(name)
 
+  """
+  返回'refs/heads/'下所有的分支信息
+  """
   def GetBranches(self):
     """Get all existing local branches.
+    """
+    """
+    current指向当前分支
+
+    遍历all_refs字典，检查以字符串'refs/heads'开始的项，实际上是检查完整的分支引用，并取得分支名称。
+    将所有分支保存在heads[name]字典中。
+
+    遍历all_refs字典，检查以字符串'refs/published'开始的项，实际上是检查完整的published引用，并取得引用名称。
+    如果published引用同时又是分支引用，则更新该引用的published属性为commit id。
     """
     current = self.CurrentBranch
     all_refs = self._allrefs
@@ -1215,11 +1238,19 @@ class Project(object):
     """Perform only the network IO portion of the sync process.
        Local working directory/branch state is not affected.
     """
+
+    """
+    如果指定以archive方式，并且当前project不属于MetaProject(即'manifests'或'repo'库)时：
+    仓库的克隆地址不能以'http://'或'https://'开头，因为archive方式要求在本地路径下执行。
+    """
     if archive and not isinstance(self, MetaProject):
       if self.remote.url.startswith(('http://', 'https://')):
         _error("%s: Cannot fetch archives from http/https remotes.", self.name)
         return False
 
+      """
+      根据relpath构造tarpath的名称，如：relpath='.repo/manifests'，则：tarpath='.repo_manifests.tar'
+      """
       name = self.relpath.replace('\\', '/')
       name = name.replace('/', '_')
       tarpath = '%s.tar' % name
@@ -1545,6 +1576,19 @@ class Project(object):
   """
   def StartBranch(self, name, branch_merge=''):
     """Create a new branch off the manifest's revision.
+    """
+    """
+    如果没有指定branch_merge，则使用revisionExpr
+
+    如果当前库已经存在名为'name'分支时，有两种情况:
+
+    1. 当前就在$name分支，直接返回
+    读取'.git/HEAD'得到当前指向的分支或提交id，如果HEAD='refs/heads/$name'，表明当前恰好位于name分支。
+    什么都不做，直接返回。
+
+    2. 当前不在$name分支，直接切换到该分支
+    如果存在'refs/heads/$name'引用，说明当前库已经存在该分支，直接切换到该分支。
+    命令：'git checkout $name --'
     """
     if not branch_merge:
       branch_merge = self.revisionExpr
@@ -1935,7 +1979,7 @@ class Project(object):
   """
   def _FetchArchive(self, tarpath, cwd=None):
     """
-    命令：'git archive -v -o tarpath --remote=remote.url --prefix=relpath/ revisionExpr'
+    命令：'git archive -v -o tarpath --remote=$remote.url --prefix=relpath/ revisionExpr'
              '-o <file>': 将archive的结果写入到<file>而不是stdout
     '--prefix=<prefix>/': 在archive的结果文件中附加'<prefix>/'路径
        '--remote=<repo>': 从<repo>指定的远端库进行archive操作，而不是本地库
@@ -3305,7 +3349,7 @@ class MetaProject(Project):
 
     """
     执行命令：'git update-ref -d refs/heads/default'
-    删除'refs/heads/default'引用。
+    删除名为'refs/heads/default'的引用。
     """
     return GitCommand(self,
                       ['update-ref', '-d', 'refs/heads/default'],
