@@ -1062,10 +1062,16 @@ class Remote(object):
     self._Set('fetch', list(map(str, self.fetch)))
 
   """
-  使用value设置当前config指定remote的key项
+  使用value设置当前config中指定remote的key项
   remote.$name.$key = $value
   """
   def _Set(self, key, value):
+    """
+    构造并执行命令：
+    'git config --file file remote.$name.$key $value'
+    如：
+    ''
+    """
     key = 'remote.%s.%s' % (self.name, key)
     return self._config.SetString(key, value)
 
