@@ -94,7 +94,9 @@ def sq(r):
 
 _project_hook_list = None
 
-
+"""
+列举'repo/hooks'目录下的所有hook文件，并存放到_project_hook_list的全局列表中
+"""
 def _ProjectHooks():
   """List the hooks present in the 'hooks' directory.
 
@@ -108,6 +110,13 @@ def _ProjectHooks():
     A list of absolute paths to all of the files in the hooks directory.
   """
   global _project_hook_list
+  """
+  列举'repo/hooks'目录下的所有文件，并存放到_project_hook_list的全局列表中。
+
+  最终得到:
+  d='.repo/repo/hooks'
+  _project_hook_list = ['.repo/repo/hooks/commit-msg', '.repo/repo/hooks/pre-auto-gc']
+  """
   if _project_hook_list is None:
     d = os.path.realpath(os.path.abspath(os.path.dirname(__file__)))
     d = os.path.join(d, 'hooks')
@@ -863,7 +872,7 @@ class Project(object):
       self._userident_email = ''
 
   """
-  返回'.git/config'中名为name的remote对象
+  返回'.git/config'中名为$name的remote对象
   如：
   $ cat .git/config
   ...
@@ -1276,6 +1285,9 @@ class Project(object):
       _error("Cannot extract archive %s: %s", tarpath, str(e))
     return False
 
+  """
+  执行网络IO部分的同步工作，不影响本地工作目录和分支状态
+  """
   def Sync_NetworkHalf(self,
                        quiet=False,
                        is_new=None,
@@ -1291,6 +1303,8 @@ class Project(object):
     """
 
     """
+    默认情况下archive为False
+
     如果指定以archive方式，并且当前project不属于MetaProject(即'manifests'或'repo'库)时：
     仓库的克隆地址不能以'http://'或'https://'开头，因为archive方式要求在本地路径下执行。
     """
@@ -1324,6 +1338,9 @@ class Project(object):
         _warn("Cannot remove archive %s: %s", tarpath, str(e))
       self._CopyAndLinkFiles()
       return True
+    """
+    外层调用Sync_NetworkHalf()没有设置is_new的情况，这里重新检测并设置is_new，来决定是否新建manifest库
+    """
     if is_new is None:
       is_new = not self.Exists
     if is_new:
@@ -1332,6 +1349,9 @@ class Project(object):
       self._UpdateHooks()
     self._InitRemote()
 
+    """
+    检查'.git/objects/info/alternates'文件，读取得到alt_dir
+    """
     if is_new:
       alt = os.path.join(self.gitdir, 'objects/info/alternates')
       try:
@@ -1345,11 +1365,20 @@ class Project(object):
     else:
       alt_dir = None
 
+    """
+    如果指定可以通过bundle的方式复制库，则调用_ApplyCloneBundle()从远程下载bundle文件
+
+    如果下载远程的bundle文件成功，从下载的bundle文件中提取得到本地的git库，并设置is_new为False，表示本地已经存在git库了。
+    从bundle文件提取到的git库并不一定是最新版本，所以后面还需要同步库到最新状态。
+    """
     if clone_bundle \
             and alt_dir is None \
             and self._ApplyCloneBundle(initial=is_new, quiet=quiet):
       is_new = False
 
+    """
+    current_branch_only指示是否只拉取当前分支数据，因为这样可以减少数据的传输量，默认为False，表示需要拉取远程全部分支数据到本地。
+    """
     if not current_branch_only:
       if self.sync_c:
         current_branch_only = True
@@ -1362,6 +1391,10 @@ class Project(object):
     need_to_fetch = not (optimized_fetch and
                          (ID_RE.match(self.revisionExpr) and
                           self._CheckForSha1()))
+
+    """
+    判断需要fetch操作时，调用_RemoteFetch()从远程fetch数据到本地
+    """
     if (need_to_fetch and
         not self._RemoteFetch(initial=is_new, quiet=quiet, alt_dir=alt_dir,
                               current_branch_only=current_branch_only,
@@ -1990,7 +2023,7 @@ class Project(object):
 
 # Direct Git Commands ##
   """
-  获取版本的160位完整哈希
+  获取revisionExpr引用对应commit的160位完整哈希
 
   如：
   $ git rev-parse --verify HEAD^0
@@ -2066,7 +2099,7 @@ class Project(object):
       raise GitError('git archive %s: %s' % (self.name, command.stderr))
 
   """
-
+  执行'git fetch'操作从远程库拉取数据
   """
   def _RemoteFetch(self, name=None,
                    current_branch_only=False,
@@ -2075,6 +2108,9 @@ class Project(object):
                    alt_dir=None,
                    no_tags=False,
                    prune=False):
+    """
+    initial指示是否新建git库，默认为False，表示本地已经存在git库，指示从远程库拉取更新
+    """
 
     is_sha1 = False
     tag_name = None
@@ -2269,12 +2305,28 @@ class Project(object):
 
     return ok
 
+  """
+  尝试从'.git/config'中的'remote.$name.url'地址下载bundle文件
+
+  如果bundle文件下载成功，则从中通过'git fetch'操作提取git库文件
+  """
   def _ApplyCloneBundle(self, initial=False, quiet=False):
+    """
+    如果是新建库(initial=True)，但'.repo/manifests/.git/config'中repo.depth=0或clone_depth=0时，什么都不做，直接返回
+    """
     if initial and \
         (self.manifest.manifestProject.config.GetString('repo.depth') or
          self.clone_depth):
       return False
 
+    """
+    读取'.git/config'中名为$name(一般为'origin')的remote源配置
+    使用remote源的url + '/clone.bundle'直接构建远程bundle源路径，并检查url替换的情况
+    例如:
+      AOSP的manifest源： https://android.googlesource.com/platform/manifest
+      则这里构建的bundle源为： https://android.googlesource.com/platform/manifest/clone.bundle
+    然后会进一步检查config的'url.*.insteadof'设置，并进行url替换。
+    """
     remote = self.GetRemote(self.remote.name)
     bundle_url = remote.url + '/clone.bundle'
     bundle_url = GitConfig.ForUser().UrlInsteadOf(bundle_url)
@@ -2283,20 +2335,41 @@ class Project(object):
                                             'persistent-https'):
       return False
 
+    """
+    生成本地bundle文件和临时文件的存放路径
+    """
     bundle_dst = os.path.join(self.gitdir, 'clone.bundle')
     bundle_tmp = os.path.join(self.gitdir, 'clone.bundle.tmp')
 
     exist_dst = os.path.exists(bundle_dst)
     exist_tmp = os.path.exists(bundle_tmp)
 
+    """
+    如果不是新建库，并且本地bundle文件以及临时文件不存在的情况下，直接返回
+    """
     if not initial and not exist_dst and not exist_tmp:
       return False
 
+    """
+    如果本地没有bundle文件，则从bundle_rul指定的远程路径获取bundle文件，并存放到bundle_dst中。
+    实际上_FetchBundle()中使用curl工具下载远程的bundle文件到本地的临时文件bundle_tmp中，下载完成后再更名为bundle_dst。
+
+    如果bundle文件下载成功，则exist_dst为True，否则为False。
+    """
     if not exist_dst:
       exist_dst = self._FetchBundle(bundle_url, bundle_tmp, bundle_dst, quiet)
+
+    """
+    所以在下载失败的情况下，直接返回False。
+    """
     if not exist_dst:
       return False
 
+    """
+    从下载的bundle文件中释放git库文件
+
+    构造并执行命令：'git fetch --quiet --update-head-ok +refs/heads/*:refs/remotes/origin/* refs/tags/*:refs/tags/*'
+    """
     cmd = ['fetch']
     if quiet:
       cmd.append('--quiet')
@@ -2471,15 +2544,34 @@ class Project(object):
     if GitCommand(self, cmd).Wait() != 0:
       raise GitError('%s merge %s ' % (self.name, head))
 
+  """
+  初始化'.git'目录
+  对同一个库操作：
+    第一次会创建'.git'目录结构；
+    第二次基本上就直接返回；
+  """
   def _InitGitDir(self, mirror_git=None, force_sync=False):
+    """
+    当第二次对一个git库调用_InitGitDir()时，
+    gitdir和objdir都已经存在，所以init_git_dir和init_obj.dir都为False。
+    此时_InitGitDir()里基本上没有太多操作。
+    """
     init_git_dir = not os.path.exists(self.gitdir)
     init_obj_dir = not os.path.exists(self.objdir)
     try:
       # Initialize the bare repository, which contains all of the objects.
+      """
+      需要初始化objdir时，执行命令：
+      1. 'mkdir $objdir'
+      2. 'git init'
+      """
       if init_obj_dir:
         os.makedirs(self.objdir)
         self.bare_objdir.init()
 
+      """
+      默认情况下初始胡时，gitdir和objdir是一样的，当objdir和gitdir不一样时，说明二者的git库和工作目录是分开的。
+      """
       # If we have a separate directory to hold refs, initialize it as well.
       if self.objdir != self.gitdir:
         if init_git_dir:
@@ -2505,10 +2597,18 @@ class Project(object):
           raise e
 
       if init_git_dir:
+        """
+        检查'.repo/manifests/.git/config'的'repo.reference'属性，提取本地镜像的路径到ref_dir。
+        """
         mp = self.manifest.manifestProject
         ref_dir = mp.config.GetString('repo.reference') or ''
 
         if ref_dir or mirror_git:
+          """
+          mirror_git为None的情形，设置:
+          mirror_git = '$ref.reference/manifests/.git'
+            repo_git = '$ref.reference/.repo/projects/.repo/manifests.git'
+          """
           if not mirror_git:
             mirror_git = os.path.join(ref_dir, self.name + '.git')
           repo_git = os.path.join(ref_dir, '.repo', 'projects',
@@ -2527,13 +2627,32 @@ class Project(object):
             _lwrite(os.path.join(self.gitdir, 'objects/info/alternates'),
                     os.path.join(ref_dir, 'objects') + '\n')
 
+        """
+        将'.repo/repo/hooks'下的hook脚本链接到'.git/hooks'目录下
+        """
         self._UpdateHooks()
 
+        """
+        使用'.repo/manifests/.git/config'中的'user.name'和'user.email'更新当前库的config设置
+        命令:
+             'git config --file .git/config user.name $user.name'
+             'git config --file .git/config user.email $user.email'
+        """
         m = self.manifest.manifestProject.config
         for key in ['user.name', 'user.email']:
           if m.Has(key, include_defaults=False):
             self.config.SetString(key, m.GetString(key))
+        """
+        命令：'git config --file .git/config filter.lfs.smudge git-lfs smudge --skip -- %f'
+        $ cat .git/config
+        ...
+        [filter "lfs"]
+          smudge = git-lfs smudge --skip -- %f
+        """
         self.config.SetString('filter.lfs.smudge', 'git-lfs smudge --skip -- %f')
+        """
+        如果指定是mirror，则设置core.bare=true，否则设置core.bare=None
+        """
         if self.manifest.IsMirror:
           self.config.SetString('core.bare', 'true')
         else:
@@ -2545,14 +2664,80 @@ class Project(object):
         shutil.rmtree(self.gitdir)
       raise
 
+  """
+  使用'.repo/repo/hooks'下的hook文件更新'.git/hooks'下的文件
+
+  注意，'.repo/repo'库自身有两个hooks文件夹，分别为'.repo/repo/hooks'和'.repo/repo/.git/hooks'：
+  $ tree .repo/repo -a -d
+  .repo/repo
+  |-- .git
+  |   |-- branches
+  |   |-- hooks
+  |   |-- info
+  |   |-- logs
+  |   |   `-- refs
+  |   |       |-- heads
+  |   |       `-- remotes
+  |   |           |-- m
+  |   |           `-- origin
+  |   |-- objects
+  |   |   |-- info
+  |   |   `-- pack
+  |   `-- refs
+  |       |-- heads
+  |       |-- remotes
+  |       |   |-- m
+  |       |   `-- origin
+  |       `-- tags
+  |-- docs
+  |-- hooks
+  |-- subcmds
+  `-- tests
+      `-- fixtures
+
+  24 directories
+  """
   def _UpdateHooks(self):
+    """
+    对于manifests库，其gitdir 的值为 '.repo/manifests.git'
+    """
     if os.path.exists(self.gitdir):
       self._InitHooks()
 
+  """
+  将'.repo/repo/hooks'目录下的hook文件链接到'.repo/manifests.git/hooks'下
+
+  $ tree .repo/manifests.git/hooks
+  .repo/manifests.git/hooks
+  |-- applypatch-msg.sample
+  |-- commit-msg -> ../../repo/hooks/commit-msg
+  |-- commit-msg.sample
+  |-- fsmonitor-watchman.sample
+  |-- post-update.sample
+  |-- pre-applypatch.sample
+  |-- pre-auto-gc -> ../../repo/hooks/pre-auto-gc
+  |-- pre-commit.sample
+  |-- pre-push.sample
+  |-- pre-rebase.sample
+  |-- pre-receive.sample
+  |-- prepare-commit-msg.sample
+  `-- update.sample
+
+  0 directories, 13 files
+  """
   def _InitHooks(self):
+    """
+    对于manifests库，其hooks 的值为 '.repo/manifest.git/hooks'
+    """
     hooks = os.path.realpath(self._gitdir_path('hooks'))
     if not os.path.exists(hooks):
       os.makedirs(hooks)
+    """
+    _ProjectHooks()列举'repo/hooks'目录下的所有文件，存放到_project_hook_list的全局变量列表中并返回:
+    _project_hook_list = ['.repo/repo/hooks/commit-msg', '.repo/repo/hooks/pre-auto-gc']
+
+    依次将'repo/hooks'下的文件链接到'manifest.git/hooks'目录下。
+    """
     for stock_hook in _ProjectHooks():
       name = os.path.basename(stock_hook)
 
@@ -3133,6 +3318,9 @@ class Project(object):
 
     如：bare_git.var('GIT_COMMITTER_IDENT')
     转换为命令：'git var GIT_COMMITTER_IDENT'
+
+    如：bare_objdir.init()
+    转换为命令：'git init'
     """
     def __getattr__(self, name):
       """Allow arbitrary git commands using pythonic syntax.
