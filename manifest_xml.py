@@ -214,7 +214,9 @@ class XmlManifest(object):
     self._Unload()
 
   """
-  传入名为name的xml文件，并基于该文件解析manifest信息并加载覆盖原有信息。
+  使用名为name的xml文件，基于该文件解析manifest信息后加载并覆盖原有信息。
+
+  例如在'repo sync'时，如果有通过参数'-m'指定manifest_name，则使用新的manifest解析和下载。
   """
   def Override(self, name):
     """Use a different manifest, just for the current instantiation.
@@ -223,7 +225,7 @@ class XmlManifest(object):
     获取名为name的文件的完整路径
 
     如果name='default.xml'，则有：
-        path='/path/to/test/.repo/manifests/default.xml'
+        path='.repo/manifests/default.xml'
     """
     path = os.path.join(self.manifestProject.worktree, name)
     if not os.path.isfile(path):
