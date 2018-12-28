@@ -237,10 +237,17 @@ to update the working directory files.
             'REPO_MIRROR_LOCATION': 'reference'}
 
   """
-  根据opt中保存的选项同步Manifest库，是整个init.py脚本的核心。
+  根据opt中保存的选项同步Manifest库，是整个init操作的脚本的核心。
+
+  额，简直就是废话，'init'操作的核心不就是为了同步manifest库嘛？
   """
   def _SyncManifest(self, opt):
     m = self.manifest.manifestProject
+    """
+    Exists属性会检查git库的gitdir('.repo/manifests.git')和objdir('.repo/manifests.git')是否存在，如果二者都存在才确认当前git库存在
+
+    如果不存在，那说明当前需要新建一个manifest库，设置is_new = True
+    """
     is_new = not m.Exists
 
     """
@@ -254,7 +261,8 @@ to update the working directory files.
     """
     if is_new:
       """
-      需要通过'-u URL, --manifest-url=URL'选项指定manifest库的地址
+      新建manifest库时需要通过'-u URL, --manifest-url=URL'选项指定manifest库的地址
+      如果没有指定，显示警告信息。
       """
       if not opt.manifest_url:
         print('fatal: manifest url (-u) is required.', file=sys.stderr)
@@ -272,6 +280,9 @@ to update the working directory files.
 
       # The manifest project object doesn't keep track of the path on the
       # server where this git is located, so let's save that here.
+      """
+      在使用了'--reference'参数的情况下，检查manifest库位于mirror镜像上的地址
+      """
       mirrored_manifest_git = None
       if opt.reference:
         """
@@ -289,9 +300,12 @@ to update the working directory files.
         这里：manifest_url = 'https://aosp.tuna.tsinghua.edu.cn/platform/manifest', reference = '/aosp/mirror'
         因此:
             manifest_git_path = 'platform/manifest'
-        mirrored_manifest_git = '/aosp/mirror/platform/manifest.git'
-        如果上面这个manifest库不存在，则尝试：
-        mirrored_manifest_git = '/aosp/mirror/.repo/manifests.git'
+
+        构造基于mirror的镜像地址：
+        mirrored_manifest_git = opt.reference + manifest_git_path = '/aosp/mirror/platform/manifest.git'
+
+        如果基于mirror镜像地址下manifest_git_path路径的manifest库不存在，则尝试非镜像方式的路径('.repo/manifests.git')：
+        mirrored_manifest_git = opt.reference + '.repo/manifests.git' = '/aosp/mirror/.repo/manifests.git'
         """
         manifest_git_path = urllib.parse.urlparse(opt.manifest_url).path[1:]
         mirrored_manifest_git = os.path.join(opt.reference, manifest_git_path)
@@ -300,24 +314,40 @@ to update the working directory files.
         if not os.path.exists(mirrored_manifest_git):
           mirrored_manifest_git = os.path.join(opt.reference + '/.repo/manifests.git')
 
+      """
+      使用mirror镜像的manifest库初始化当前的manifest库的git目录
+      """
       m._InitGitDir(mirror_git=mirrored_manifest_git)
 
       """
       如果'repo init'带有'-b REVISION, --manifest-branch=REVISION'参数，则根据该参数设置manifest库的分支。
-      如果不带有分支参数，则默认为'refs/heads/master'
+      如果不带有分支参数，则默认分支为'refs/heads/master'
       """
       if opt.manifest_branch:
         m.revisionExpr = opt.manifest_branch
       else:
         m.revisionExpr = 'refs/heads/master'
     else:
+      """
+      在manifest库已经存在的情况下执行同步操作
+
+      例如，基于原来的master分支同步或同步到一个新的分支上:
+      如果有指定新的分支'manifest_branch'，则设置分支引用参数用于同步;
+      如果没有指定新的分支，则PreSync()操作会基于manifest库'.git/config'中当前branch的merge属性设置分支引用参数用于同步;
+      """
       if opt.manifest_branch:
         m.revisionExpr = opt.manifest_branch
       else:
         m.PreSync()
 
     """
-    如果'repo init'带有'--manifest-url=url'参数，则使用url参数替代从'.repo/manifest/.git/config'文件加载的manifest源地址。
+    如果'repo init'带有'--manifest-url=url'参数，则使用url参数替代manifest库的'.git/config'中名为$name的remote源地址。
+
+    主要包含以下操作：(这里的$name为'origin')
+    1. 获取'.git/config'中名为$name的remote源对象
+    2. 将remote源的url设置为参数的'manifest_url'
+    3. 更新manifest库的fetch设置，如 fetch = '+refs/heads/*:refs/remotes/origin/*'
+    4. 将remote源的设置保存回'.git/config'文件
     """
     if opt.manifest_url:
       r = m.GetRemote(m.remote.name)
@@ -326,7 +356,7 @@ to update the working directory files.
       r.Save()
 
     """
-    对groups选项参数进行分割
+    对groups选项参数进行处理，默认为'default'，所以默认groups = ['default']
 
     -g GROUP, --groups=GROUP
                         restrict manifest projects to ones with specified
@@ -335,6 +365,16 @@ to update the working directory files.
     groups = re.split(r'[,\s]+', opt.groups)
     all_platforms = ['linux', 'darwin', 'windows']
     platformize = lambda x: 'platform-' + x
+
+    """
+    对platform参数进行处理，默认为auto，此时实际上是运行时通过platform.system()返回值判断系统是linux, darwin还是其他。
+
+    如果opt.platform == 'auto'，对于Ubuntu系统，platform.system()为'Linux'，则groups = ['default', 'platform-linux']
+
+    -p PLATFORM, --platform=PLATFORM
+                        restrict manifest projects to ones with a specified
+                        platform group [auto|all|none|linux|darwin|...]
+    """
     if opt.platform == 'auto':
       if (not opt.mirror and
           not m.config.GetString('repo.mirror') == 'true'):
@@ -347,6 +387,21 @@ to update the working directory files.
       print('fatal: invalid platform flag', file=sys.stderr)
       sys.exit(1)
 
+    """
+    将解析得到的groups生成groupstr字符串，并写入到'.git/config'文件中
+    对于linux下，默认groups = ['default', 'platform-linux']，因此最终groupstr = None
+
+    命令: 'git config --file .repo/manifests/.git/config manifest.groups $groupstr'
+
+    例如'group=G1, platform=all'的情况：
+    $ repo init -g G1 -p all
+    $ cat .repo/manifests/.git/config
+    ...
+    [manifest]
+      groups = G1,platform-linux,platform-darwin,platform-windows
+
+    可见，这里的manifest.groups被设置为'G1,platform-linux,platform-darwin,platform-windows'
+    """
     groups = [x for x in groups if x]
     groupstr = ','.join(groups)
     if opt.platform == 'auto' and groupstr == 'default,platform-' + platform.system().lower():
@@ -354,15 +409,15 @@ to update the working directory files.
     m.config.SetString('manifest.groups', groupstr)
 
     """
-    如果'repo init'带有'--reference=DIR'参数，则向manifest的config文件写入'repo.reference=DIR'，相当于命令：
-    'git config --file .repo/manifests/.git/config repo.reference DIR'
+    如果'repo init'带有'--reference=DIR'参数，则向manifest的config文件写入'repo.reference=DIR'，
+    命令：'git config --file .repo/manifests/.git/config repo.reference $DIR'
     """
     if opt.reference:
       m.config.SetString('repo.reference', opt.reference)
 
     """
-    如果'repo init'带有'--archive'参数，则向manifest的config文件写入'repo.archive=true'，相当于命令：
-    'git config --file .repo/manifests/.git/config repo.archive true'
+    如果'repo init'带有'--archive'参数，则向manifest的config文件写入'repo.archive=true'
+    命令：'git config --file .repo/manifests/.git/config repo.archive true'
     """
     if opt.archive:
       if is_new:
@@ -375,8 +430,8 @@ to update the working directory files.
         sys.exit(1)
 
     """
-    如果'repo init'带有'--mirror'参数，则向manifest的config文件写入'repo.mirror=true'，相当于命令：
-    'git config --file .repo/manifests/.git/config repo.mirror true'
+    如果'repo init'带有'--mirror'参数，则向manifest的config文件写入'repo.mirror=true'
+    命令：'git config --file .repo/manifests/.git/config repo.mirror true'
 
     特别注意的是，'--mirror'参数只能在第一次运行仓库初始化命令时执行。
     """
