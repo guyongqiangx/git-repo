@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2008 The Android Open Source Project
 #
@@ -83,6 +84,137 @@ class _FetchError(Exception):
   """Internal error thrown in _FetchHelper() when we don't want stack trace."""
   pass
 
+"""
+$ repo help sync
+
+Summary
+-------
+Update working tree to the latest revision
+
+Usage: repo sync [<project>...]
+
+Options:
+  -h, --help            show this help message and exit
+  -f, --force-broken    continue sync even if a project fails to sync
+  --force-sync          overwrite an existing git directory if it needs to
+                        point to a different object directory. WARNING: this
+                        may cause loss of data
+  -l, --local-only      only update working tree, don't fetch
+  -n, --network-only    fetch only, don't update working tree
+  -d, --detach          detach projects back to manifest revision
+  -c, --current-branch  fetch only current branch from server
+  -q, --quiet           be more quiet
+  -j JOBS, --jobs=JOBS  projects to fetch simultaneously (default 1)
+  -m NAME.xml, --manifest-name=NAME.xml
+                        temporary manifest to use for this sync
+  --no-clone-bundle     disable use of /clone.bundle on HTTP/HTTPS
+  -u MANIFEST_SERVER_USERNAME, --manifest-server-username=MANIFEST_SERVER_USERNAME
+                        username to authenticate with the manifest server
+  -p MANIFEST_SERVER_PASSWORD, --manifest-server-password=MANIFEST_SERVER_PASSWORD
+                        password to authenticate with the manifest server
+  --fetch-submodules    fetch submodules from server
+  --no-tags             don't fetch tags
+  --optimized-fetch     only fetch projects fixed to sha1 if revision does not
+                        exist locally
+  --prune               delete refs that no longer exist on the remote
+  -s, --smart-sync      smart sync using manifest from the latest known good
+                        build
+  -t SMART_TAG, --smart-tag=SMART_TAG
+                        smart sync using manifest from a known tag
+
+  repo Version options:
+    --no-repo-verify    do not verify repo source code
+
+Description
+-----------
+The 'repo sync' command synchronizes local project directories with the
+remote repositories specified in the manifest. If a local project does
+not yet exist, it will clone a new local directory from the remote
+repository and set up tracking branches as specified in the manifest. If
+the local project already exists, 'repo sync' will update the remote
+branches and rebase any new local changes on top of the new remote
+changes.
+
+'repo sync' will synchronize all projects listed at the command line.
+Projects can be specified either by name, or by a relative or absolute
+path to the project's local directory. If no projects are specified,
+'repo sync' will synchronize all projects listed in the manifest.
+
+The -d/--detach option can be used to switch specified projects back to
+the manifest revision. This option is especially helpful if the project
+is currently on a topic branch, but the manifest revision is temporarily
+needed.
+
+The -s/--smart-sync option can be used to sync to a known good build as
+specified by the manifest-server element in the current manifest. The
+-t/--smart-tag option is similar and allows you to specify a custom
+tag/label.
+
+The -u/--manifest-server-username and -p/--manifest-server-password
+options can be used to specify a username and password to authenticate
+with the manifest server when using the -s or -t option.
+
+If -u and -p are not specified when using the -s or -t option, 'repo
+sync' will attempt to read authentication credentials for the manifest
+server from the user's .netrc file.
+
+'repo sync' will not use authentication credentials from -u/-p or .netrc
+if the manifest server specified in the manifest file already includes
+credentials.
+
+The -f/--force-broken option can be used to proceed with syncing other
+projects if a project sync fails.
+
+The --force-sync option can be used to overwrite existing git
+directories if they have previously been linked to a different object
+direcotry. WARNING: This may cause data to be lost since refs may be
+removed when overwriting.
+
+The --no-clone-bundle option disables any attempt to use
+$URL/clone.bundle to bootstrap a new Git repository from a resumeable
+bundle file on a content delivery network. This may be necessary if
+there are problems with the local Python HTTP client or proxy
+configuration, but the Git binary works.
+
+The --fetch-submodules option enables fetching Git submodules of a
+project from server.
+
+The -c/--current-branch option can be used to only fetch objects that
+are on the branch specified by a project's revision.
+
+The --optimized-fetch option can be used to only fetch projects that are
+fixed to a sha1 revision if the sha1 revision does not already exist
+locally.
+
+The --prune option can be used to remove any refs that no longer exist
+on the remote.
+
+SSH Connections
+---------------
+If at least one project remote URL uses an SSH connection (ssh://,
+git+ssh://, or user@host:path syntax) repo will automatically enable the
+SSH ControlMaster option when connecting to that host. This feature
+permits other projects in the same 'repo sync' session to reuse the same
+SSH tunnel, saving connection setup overheads.
+
+To disable this behavior on UNIX platforms, set the GIT_SSH environment
+variable to 'ssh'. For example:
+
+  export GIT_SSH=ssh
+  repo sync
+
+  Compatibility
+  ~~~~~~~~~~~~~
+This feature is automatically disabled on Windows, due to the lack of
+UNIX domain socket support.
+
+This feature is not compatible with url.insteadof rewrites in the user's
+~/.gitconfig. 'repo sync' is currently not able to perform the rewrite
+early enough to establish the ControlMaster tunnel.
+
+If the remote SSH daemon is Gerrit Code Review, version 2.0.10 or later
+is required to fix a server side protocol bug.
+"""
 class Sync(Command, MirrorSafeCommand):
   jobs = 1
   common = True
@@ -184,7 +316,27 @@ later is required to fix a server side protocol bug.
 
 """
 
+  """
+  定义'repo sync'命令的参数选项
+  """
   def _Options(self, p, show_smart=True):
+    """
+    尝试读取'.repo/manifest.xml'中'default'项的'sync_j'属性
+    如AOSP默认的manifest中：
+    $ head -10 .repo/manifest.xml
+    <?xml version="1.0" encoding="UTF-8"?>
+    <manifest>
+      <remote  name="aosp"
+               fetch=".."
+               review="https://android-review.googlesource.com/" />
+      <default revision="master"
+               remote="aosp"
+               sync-j="4" />
+
+    这里'default'的'sync-j'属性指定了'aosp'远端服务器设定的并发任务数为4
+
+    如果'default'中没有'sync-j'设置，则默认的并发任务数为1
+    """
     try:
       self.jobs = self.manifest.default.sync_j
     except ManifestParseError:
@@ -568,13 +720,43 @@ later is required to fix a server side protocol bug.
       fd.close()
     return 0
 
+  """
+  'repo sync'中'sync'操作的主函数。
+  """
   def Execute(self, opt, args):
+    """
+    'repo sync'命令的'-j/--jobs'选项用于指定sync时并发的任务数
+    -j JOBS, --jobs=JOBS  projects to fetch simultaneously (default 1)
+
+    如果'manifest.xml'中'default'节点有指定'sync-j'参数，则该参数会作为opt.jobs的默认值。
+    但是默认的opt.jobs在运行时会被'-j'选项指定的参数覆盖。
+
+    例如我就经常在服务器上使用'repo sync -j32'，同时开始32个并发的同步任务。
+    """
     if opt.jobs:
       self.jobs = opt.jobs
     if self.jobs > 1:
       soft_limit, _ = _rlimit_nofile()
       self.jobs = min(self.jobs, (soft_limit - 5) / 3)
 
+    """
+    repo管理下，每一个git库的同步都分为两个部分，network部分和local部分。
+
+    -l, --local-only      only update working tree, don't fetch
+    -n, --network-only    fetch only, don't update working tree
+    -d, --detach          detach projects back to manifest revision
+
+    其中'-n'属于network部分，'-l'和'-d'属于local部分，所以'-n'和'-l'/'-d'选项不能组合使用。
+
+    另外，'-m'和'-s'/'-t'参数也不能同时使用：
+    -m NAME.xml, --manifest-name=NAME.xml
+                          temporary manifest to use for this sync
+    ...
+    -s, --smart-sync      smart sync using manifest from the latest known good
+                          build
+    -t SMART_TAG, --smart-tag=SMART_TAG
+                          smart sync using manifest from a known tag
+    """
     if opt.network_only and opt.detach_head:
       print('error: cannot combine -n and -d', file=sys.stderr)
       sys.exit(1)
@@ -596,6 +778,9 @@ later is required to fix a server side protocol bug.
         print('error: both -u and -p must be given', file=sys.stderr)
         sys.exit(1)
 
+    """
+    如果'repo sync'有通过参数'-m'指定manifest_name，则解析新的manifest来进行同步操作
+    """
     if opt.manifest_name:
       self.manifest.Override(opt.manifest_name)
 
@@ -604,6 +789,9 @@ later is required to fix a server side protocol bug.
     smart_sync_manifest_path = os.path.join(
       self.manifest.manifestProject.worktree, smart_sync_manifest_name)
 
+    """
+    ’repo init'操作中有指定'-s'/'-t'参数时，使用'smart_sync'或'smart_tag'的方式同步。
+    """
     if opt.smart_sync or opt.smart_tag:
       if not self.manifest.manifest_server:
         print('error: cannot smart sync: no manifest server defined in '
@@ -699,6 +887,9 @@ later is required to fix a server side protocol bug.
               file=sys.stderr)
         sys.exit(1)
     else:  # Not smart sync or smart tag mode
+      """
+      没有指定'smart_sync'或'smart_tag'时，如果'.repo/manifests/smart_sync_override.xml'文件存在，先删除
+      """
       if os.path.isfile(smart_sync_manifest_path):
         try:
           os.remove(smart_sync_manifest_path)
@@ -706,21 +897,33 @@ later is required to fix a server side protocol bug.
           print('error: failed to remove existing smart sync override manifest: %s' %
                 e, file=sys.stderr)
 
+    """
+    PreSync()操作准备'.repo/repo'和'.repo/manifests'库当前分支同步所需的merge参数
+    """
     rp = self.manifest.repoProject
     rp.PreSync()
 
     mp = self.manifest.manifestProject
     mp.PreSync()
 
+    """
+    如果'repo sync'有指定'--repo-upgraded'选项，则在同步之前尝试更新'.repo/repo'库自身
+    """
     if opt.repo_upgraded:
       _PostRepoUpgrade(self.manifest, quiet=opt.quiet)
 
+    """
+    如果'repo sync'没有指定'-l'参数，即没有要求只进行local本地的操作，则fetch最新的manifest数据到本地。
+    """
     if not opt.local_only:
       mp.Sync_NetworkHalf(quiet=opt.quiet,
                           current_branch_only=opt.current_branch_only,
                           no_tags=opt.no_tags,
                           optimized_fetch=opt.optimized_fetch)
 
+    """
+    如果检测到manifest库有更新，执行manifest库本地的更新工作，使其在同步开始时保持最新的状态
+    """
     if mp.HasChanges:
       syncbuf = SyncBuffer(mp.config)
       mp.Sync_LocalHalf(syncbuf)
@@ -765,6 +968,9 @@ later is required to fix a server side protocol bug.
               for p in opened_projects]
       if not args:
         return
+    """
+    获取manifests库中指定的所有需要同步的projects
+    """
     all_projects = self.GetProjects(args,
                                     missing_ok=True,
                                     submodules_ok=opt.fetch_submodules)
