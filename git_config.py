@@ -234,8 +234,8 @@ class GitConfig(object):
     $ cat .git/config
     ...
     [branch "default"]
-    remote = origin
-    merge = refs/heads/stable
+      remote = origin
+      merge = refs/heads/stable
     $ git config  url.http://localhost.insteadof https://gerrit.googlesource.com/git-repo
     $ git config  --add url.http://localhost.insteadof https://github.com/guyongqiangx/git-repo
     $ git config  --add url.http://localhost.insteadof https://aosp.tuna.tsinghua.edu.cn/git-repo
@@ -603,8 +603,34 @@ class GitConfig(object):
     else:
       GitError('git config %s: %s' % (str(args), p.stderr))
 
-
+"""
+一个RefSpec对象代表config文件中的'remote.$name.fetch'属性设置, 如：
+$ cat .git/config
+...
+[remote "origin"]
+  url = https://gerrit.googlesource.com/git-repo
+  fetch = +refs/heads/*:refs/remotes/origin/*
+...
+其fetch属性指定了远程分支和本地分支的对应关系，即从远程抓取的各分支对象应该更新到本地的哪些分支上
+"""
 class RefSpec(object):
+  """
+  '.git/config'文件中，'remote.$name.fetch'属性指定了fetch操作的refspec
+  换句话说，指定了名为$name的远程源和本地分支的对应关系，如:
+  $ cat .git/config
+  ...
+  [remote "origin"]
+    url = https://gerrit.googlesource.com/git-repo
+    fetch = +refs/heads/*:refs/remotes/origin/*
+
+  其refspec为'+refs/heads/*:refs/remotes/origin/*'
+  即抓取远程'remote'的分支('refs/heads/*')数据，更新到本地分支('refs/remotes/origin/*')下。
+
+  因此，
+  如果执行'git fetch'命令，默认会拉取'remote'源所有的分支('refs/heads/*')，更新到相应的跟踪分支('refs/remotes/origin/*')上。
+  ...
+  """
+
   """A Git refspec line, split into its components:
 
       forced:  True if the line starts with '+'
@@ -612,6 +638,13 @@ class RefSpec(object):
       dst:     Right side of the line
   """
 
+  """
+  使用类似'+refs/heads/*:refs/remotes/origin/*'字符串初始化RefSpec类对象。
+  如 rs = '+refs/heads/*:refs/remotes/origin/*'，有:
+     lhs = 'refs/heads/*'
+     rhl = 'refs/remotes/origin/*'
+  由于rs以'+'开始，所以 forced = True
+  """
   @classmethod
   def FromString(cls, rs):
     lhs, rhs = rs.split(':', 2)
@@ -633,7 +666,10 @@ class RefSpec(object):
     self.dst = rhs
 
   """
-  判断rev是否同source匹配
+  判断rev指定的分支是否包含在src分支规则指定的分支中
+
+  如src='refs/heads/*', rev='refs/heads/master'
+  src指明所有以'refs/heads/'开头的分支，rev显然满足。
   """
   def SourceMatches(self, rev):
     """
@@ -650,7 +686,10 @@ class RefSpec(object):
     return False
 
   """
-  判断ref是否同dst匹配
+  判断rev指定的分支是否包含在dst分支规则指定的分支中
+
+  如dst='refs/heads/*', rev='refs/heads/master'
+  dst指明所有以'refs/heads/'开头的分支，rev显然满足。
   """
   def DestMatches(self, ref):
     """
@@ -666,13 +705,23 @@ class RefSpec(object):
         return True
     return False
 
+  """
+  返回与rev匹配的dst分支
+  """
   def MapSource(self, rev):
+    """
+    如果src匹配所有分支(以'/*'结尾)，则返回rev对应的具体的目标分支, 如:
+    src = 'refs/heads/*'
+    dst = 'refs/remotes/origin/*'
+
+    调用MapSource(rev = 'refs/heads/stable')返回与rev匹配的dst分支为：'refs/remotes/origin/stable'
+    """
     if self.src.endswith('/*'):
       return self.dst[:-1] + rev[len(self.src) - 1:]
     return self.dst
 
   """
-  转换为字符串'+src:dst'的格式
+  将RefSpec对象转换为字符串'+src:dst'的格式
 
   如：'+refs/heads/*:refs/remotes/origin/*'
   """
@@ -1037,8 +1086,18 @@ class Remote(object):
         return True
     return False
 
+  """
+  根据mirror设置，更新RefSpec对象的映射信息，即远程分支和本地分支的对应关系
+  """
   def ResetFetch(self, mirror=False):
     """Set the fetch refspec to its default value.
+    """
+    """
+    根据是否基于mirror镜像，构建不同的refspec:
+    1. 基于mirror镜像
+       fetch = '+refs/heads/*:refs/heads/*'
+    2. 不基于mirror镜像
+       fetch = '+refs/heads/*:refs/remotes/origin/*'
     """
     if mirror:
       dst = 'refs/heads/*'
@@ -1048,6 +1107,17 @@ class Remote(object):
 
   """
   将remote的设置保存到当前config对应的文件中
+
+  保存的设置包括：
+  $ cat .git/config
+  ...
+  [remote "origin"]
+    url = https://github.com/guyongqiangx/git-repo.git
+    pushurl = ...
+    review = ...
+    projectname = ...
+    fetch = +refs/heads/*:refs/remotes/origin/*
+  ...
   """
   def Save(self):
     """Save this remote to the configuration.
@@ -1064,6 +1134,11 @@ class Remote(object):
   """
   使用value设置当前config中指定remote的key项
   remote.$name.$key = $value
+
+  $ cat .git/config
+  ...
+  [remote "$name"]
+    $key = $value
   """
   def _Set(self, key, value):
     """
@@ -1078,6 +1153,11 @@ class Remote(object):
   """
   获取当前config指定remote的key设置
   remote.$name.$key
+
+  $ cat .git/config
+  ...
+  [remote "$name"]
+    $key = $value
   """
   def _Get(self, key, all_keys=False):
     key = 'remote.%s.%s' % (self.name, key)
