@@ -141,6 +141,38 @@ class _XmlRemote(object):
                       review=self.reviewUrl,
                       orig_name=self.name)
 
+"""
+XmlManifest对象，用于访问和操作'.git/manifest.xml'文件，其公开的接口包括：
+构造函数:
+  XmlManifest(repodir)
+成员变量:
+  repodir
+  topdir
+  manifestFile
+  globalConfig
+  localManifestWarning
+  isGitcClient
+  repoProject
+  manifestProject
+成员函数:
+  Override(name)
+  Link(name)
+  Save(fd, peg_rev=False, peg_rev_upstream=True, groups=None)
+  paths()
+  projects()
+  remotes()
+  default()
+  repo_hooks_project()
+  notice()
+  manifest_server()
+  IsMirror()
+  IsArchive()
+  GetProjectPaths(name, path)
+  GetProjectsWithName(name)
+  GetSubprojectName(parent, submodule_path)
+  GetSubprojectPaths(parent, name, path)
+  projectsDiff(manifest)
+"""
 class XmlManifest(object):
   """manages the repo configuration file"""
 
