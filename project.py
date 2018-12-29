@@ -647,7 +647,94 @@ class RepoHook(object):
     # Run the hook with the same version of python we're using.
     self._ExecuteHook(**kwargs)
 
+"""
+Project对象，用于访问和操作'.git/manifest.xml'文件中的Project节点，其公开的接口包括：
+构造函数:
+  Project(...)
+成员变量:
+  manifest
+  name
+  remote
+  gitdir
+  objdir
+  worktree
+  relpath
+  revisionExpr
+  revisionId
+  rebase
+  groups
+  sync_c
+  sync_s
+  clone_depth
+  upstream
+  parent
+  is_derived
+  optimized_fetch
+  subprojects
+  snapshots
+  copyfiles
+  linkfiles
+  annotations
+  config
+  work_git
+  bare_git
+  bare_ref
+  bare_objdir
+  dest_branch
+  old_revision
+  enabled_repo_hooks
+成员函数:
+  Derived()
+  Exists()
+  CurrentBranch()
+  IsRebaseInProgress()
+  IsDirty(consider_untracked=True)
+  UserName()
+  UserEmail()
+  GetRemote(name)
+  GetBranch(name)
+  GetBranches()
+  MatchesGroups(manifest_groups)
+  UncommitedFiles(get_all=True)
+  HasChanges()
+  PrintWorkTreeStatus(output_redir=None)
+  PrintWorkTreeDiff(absolute_paths=False)
+  WasPublished(branch, all_refs=None)
+  CleanPublishedCache(all_refs=None)
+  GetUploadableBranches(selected_branch=None)
+  GetUploadableBranch(branch_name)
+  UploadForReview(people, auto_topic=False, draft=False, dest_branch=None)
+  Sync_NetworkHalf(...)
+  PostRepoUpgrade()
+  GetCommitRevisionId()
+  GetRevisionId(all_refs=None)
+  Sync_LocalHalf(syncbuf, force_sync=False)
+  AddCopyFile(src, dest, absdest)
+  AddLinkFile(src, dest, absdest)
+  AddAnnotation(name, value, keep)
+  DownloadPatchSet(change_id, patch_id)
+  StartBranch(name, branch_merge='')
+  CheckoutBranch(name)
+  AbandonBranch(name)
+  PruneHeads()
+  GetRegisteredSubprojects()
+  GetDerivedSubprojects()
+  getAddedAndRemovedLogs(toProject, oneline=False, color=True, pretty_format=None)
 
+包含的子类_GitGetByExec:
+  构造函数:
+    _GitGetByExec(project, bare, gitdir)
+  成员函数:
+    LsOthers()
+    DiffZ(name, *args)
+    GetHead()
+    SetHead(ref, message=None)
+    DetachHead(new, message=None)
+    UpdateRef(name, new, old=None, message=None, detach=False)
+    DeleteRef(name, old=None)
+    rev_list(*args, **kw)
+    __getattr__(name)
+"""
 class Project(object):
   # These objects can be shared between several working trees.
   shareable_files = ['description', 'info']
@@ -2023,7 +2110,7 @@ class Project(object):
 
 # Direct Git Commands ##
   """
-  获取revisionExpr引用对应commit的160位完整哈希
+  检查revisionExpr引用对应commit的160位完整哈希
 
   如：
   $ git rev-parse --verify HEAD^0
@@ -2099,7 +2186,7 @@ class Project(object):
       raise GitError('git archive %s: %s' % (self.name, command.stderr))
 
   """
-  执行'git fetch'操作从远程库拉取数据
+  执行'git fetch'操作从远程库拉取数据到本地的跟踪分支
   """
   def _RemoteFetch(self, name=None,
                    current_branch_only=False,
@@ -2131,14 +2218,29 @@ class Project(object):
     if depth:
       current_branch_only = True
 
+    """
+    检查revisionExpr是否为160位(40个字符)的sha1哈希，如果是，则is_sha1为True
+
+    revisionExpr有两种情况：
+    1. 分支引用，如: 'refs/heads/default'
+    2. 160位哈希，如: aa24c6e7ba6f5ce90116f0265b96d2dfef9ece8f
+    """
     if ID_RE.match(self.revisionExpr) is not None:
       is_sha1 = True
 
     if current_branch_only:
+      """
+      revisionExpr为指向某个tag的引用，即'refs/tags/xxx'格式，提取tag name
+      """
       if self.revisionExpr.startswith(R_TAGS):
         # this is a tag and its sha1 value should never change
         tag_name = self.revisionExpr[len(R_TAGS):]
 
+      """
+      如果当前revisionExpr为40字符的哈希或从其中提取的tag_name不为空的情况下，说明revisionExpr已经指向具体的提交对象
+      通过检查revisionExpr所指向提交对象的40字符的哈希来验证该对象是否真的存在，说明已经同步过了。
+      疑问是：即使同步过了，这里能保证已经同步的就是最新的吗？
+      """
       if is_sha1 or tag_name is not None:
         if self._CheckForSha1():
           return True
@@ -2155,6 +2257,9 @@ class Project(object):
         else:
           current_branch_only = False
 
+    """
+    如果调用_RemoteFetch()操作时没有指定远程remote名称，则使用已有的remote.name
+    """
     if not name:
       name = self.remote.name
 
@@ -2163,6 +2268,9 @@ class Project(object):
     if remote.PreConnectFetch():
       ssh_proxy = True
 
+    """
+    initial指示是否新创建git库
+    """
     if initial:
       if alt_dir and 'objects' == os.path.basename(alt_dir):
         ref_dir = os.path.dirname(alt_dir)
@@ -2201,6 +2309,13 @@ class Project(object):
       else:
         alt_dir = None
 
+    """
+    构造'git fetch'命令，如:
+    1. 不带tags
+     'git fetch --depth=$depth --quiet origin --no-tags +refs/heads/*:refs/remotes/origin/*'
+    2. 带有tags
+     'git fetch --depth=$depth --quiet origin --tags +refs/heads/*:refs/remotes/origin/* tag $tag_name'
+    """
     cmd = ['fetch']
 
     if depth:
@@ -2232,11 +2347,19 @@ class Project(object):
     spec = []
     if not current_branch_only:
       # Fetch whole repo
+      """
+      生成fetch操作的refspec: 将remote源的所有分支('+refs/heads/*')更新拉取到本地对应分支上('refs/remotes/origin/*')
+      """
       spec.append(str((u'+refs/heads/*:') + remote.ToLocal('refs/heads/*')))
     elif tag_name is not None:
       spec.append('tag')
       spec.append(tag_name)
 
+    """
+    不是mirror镜像库的情况下，添加当前分支的跟踪分支fetch refspec: 'refs/heads/$branch:refs/remotes/origin/$branch'
+    如当前位于'3.2.0'分支：
+      'git fetch origin --tags +refs/heads/*:refs/remotes/origin/* +refs/heads/3.2.0:refs/remotes/origin/3.2.0'
+    """
     if not self.manifest.IsMirror:
       branch = self.revisionExpr
       if is_sha1 and depth and git_require((1, 8, 3)):
@@ -2263,6 +2386,9 @@ class Project(object):
       elif (not _i and
             "error:" in gitcmd.stderr and
             "git remote prune" in gitcmd.stderr):
+        """
+        命令：'git remote prune $name'
+        """
         prunecmd = GitCommand(self, ['remote', 'prune', name], bare=True,
                               ssh_proxy=ssh_proxy)
         ret = prunecmd.Wait()
@@ -2970,18 +3096,19 @@ class Project(object):
     return logs
 
   """
-  建立可操作的Git库对象，包括各种引用和属性读取操作
-
-  操作包括：
-  .LsOthers()
-  .DiffZ(...)
-  .GetHead()
-  .SetHead(ref)
-  .DetachHead(new)
-  .UpdateRef(name, new)
-  .DeleteRef(name)
-  .rev_list(...)
-  __getattr__(name)
+  Project类包含的子类_GitGetByExec, 建立可操作的Git库对象，包括各种引用和属性读取操作
+    构造函数:
+      _GitGetByExec(project, bare, gitdir)
+    成员函数:
+      LsOthers()
+      DiffZ(name, *args)
+      GetHead()
+      SetHead(ref, message=None)
+      DetachHead(new, message=None)
+      UpdateRef(name, new, old=None, message=None, detach=False)
+      DeleteRef(name, old=None)
+      rev_list(*args, **kw)
+      __getattr__(name)
   """
   class _GitGetByExec(object):
 
