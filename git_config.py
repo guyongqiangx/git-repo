@@ -92,6 +92,24 @@ def _key(name):
   parts[-1] = parts[-1].lower()
   return '.'.join(parts)
 
+"""
+GitConfig对象，用于访问和操作'.git/config'文件，其公开的接口包括：
+构造函数:
+  GitConfig(configfile, defaults=None, jsonFile=None)
+静态函数:
+  ForUser()
+  ForRepository(gitdir, defaults=None)
+成员函数:
+  Has(name, include_defaults = True)
+  GetBoolean(name)
+  GetString(name, all_keys=False)
+  SetString(name, value)
+  GetRemote(name)
+  GetBranch(name)
+  GetSubSections(section)
+  HasSection(section, subsection = '')
+  UrlInsteadOf(url)
+"""
 class GitConfig(object):
   _ForUser = None
 
@@ -714,7 +732,8 @@ class RefSpec(object):
     src = 'refs/heads/*'
     dst = 'refs/remotes/origin/*'
 
-    调用MapSource(rev = 'refs/heads/stable')返回与rev匹配的dst分支为：'refs/remotes/origin/stable'
+    如: MapSource(rev = 'refs/heads/stable')返回与rev匹配的dst分支为：'refs/remotes/origin/stable'
+        MapSource(rev = 'refs/heads/*')返回与rev匹配的dst分支为：'refs/remotes/origin/*'
     """
     if self.src.endswith('/*'):
       return self.dst[:-1] + rev[len(self.src) - 1:]
@@ -922,6 +941,24 @@ def _preconnect(url):
   return False
 
 """
+Remote对象，用于访问和操作'.git/config'文件中的remote设置，其公开的接口包括：
+构造函数:
+  Remote(config, name)
+成员变量:
+  name
+  url
+  pushUrl
+  review
+  projectname
+  fetch
+成员函数:
+  PreConnectFetch()
+  ReviewUrl(userEmail)
+  ToLocal(rev)
+  WritesTo(ref)
+  ResetFetch(mirror=False)
+  Save()
+
 一个Remote对象代表config文件中的一个remote设置, 如：
 $ cat .git/config
 ...
@@ -1060,19 +1097,38 @@ class Remote(object):
       username = userEmail.split('@')[0]
     return 'ssh://%s@%s:%s/' % (username, host, port)
 
+  """
+  将rev指定的分支名转换为remote源的本地跟踪分支
+
+  如: remote.ToLocal(rev='refs/heads/*')，返回'refs/remote/origin/heads/*'
+  """
   def ToLocal(self, rev):
     """Convert a remote revision string to something we have locally.
     """
     if self.name == '.' or IsId(rev):
       return rev
 
+    """
+    如果rev不以'refs/'开头，如'stable'，则更新为 ref = 'refs/heads/stable'
+    """
     if not rev.startswith('refs/'):
       rev = R_HEADS + rev
 
+    """
+    检查rev指定的分支是否位于remote.$name.fetch属性的source分支中，如果是，返回对应的dst分支
+
+    例如：refspec = '+refs/heads/*:refs/remote/origin/heads/*', rev='refs/heads/stable', 有：
+    src = 'refs/heads/*'
+    dst = 'refs/remote/origin/heads/*'
+    rev = 'refs/heads/stable'
+    显然，这里rev指定的分支包含在src分支规则中，因此返回rev对应的dst分支：'refs/remotes/origin/heads/stable'
+    """
     for spec in self.fetch:
       if spec.SourceMatches(rev):
         return spec.MapSource(rev)
-
+    """
+    如果rev不以'refs/heads/'开头，则直接返回，例如40个字符的完整哈希'aa24c6e7ba6f5ce90116f0265b96d2dfef9ece8f'
+    """
     if not rev.startswith(R_HEADS):
       return rev
 
