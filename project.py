@@ -1526,7 +1526,7 @@ class Project(object):
                                          (self.revisionExpr, self.name))
 
   """
-  获取revisionExpr对应的完整的提交id
+  直接返回revisionId或获取revisionExpr对应的完整的提交id
   """
   def GetRevisionId(self, all_refs=None):
     if self.revisionId:
@@ -3043,7 +3043,15 @@ class Project(object):
   def _gitdir_path(self, path):
     return os.path.realpath(os.path.join(self.gitdir, path))
 
+  """
+  获取由参数args指定的提交列表
+  """
   def _revlist(self, *args, **kw):
+    """
+    构造命令: 'git rev-list $args --'
+    如: 'git rev-list foo bar', 获取从foo到bar之前的提交列表
+    如: 'git rev-list origin..HEAD', 获取从origin到HEAD之前的提交列表
+    """
     a = []
     a.extend(args)
     a.append('--')
@@ -3404,7 +3412,7 @@ class Project(object):
       self._project.bare_ref.deleted(name)
 
     """
-    获取指定的提交列表
+    获取由参数args指定的提交列表
     """
     def rev_list(self, *args, **kw):
       """
@@ -3630,7 +3638,16 @@ class SyncBuffer(object):
     self._messages = []
     self._failures = []
 
-
+"""
+MetaProject对象，用于访问和操作repo库的元项目('.repo/repo'和'.repo/manifests')，其公开的接口包括：
+构造函数:
+  MetaProject(manifest, name, gitdir, worktree)
+成员函数:
+  PreSync()
+  MetaBranchSwitch()
+  LastFetch()
+  HasChanges()
+"""
 class MetaProject(Project):
 
   """A special project housed under .repo.
@@ -3680,7 +3697,7 @@ class MetaProject(Project):
                      groups=None)
 
   """
-  准备同步所需的merge分支参数
+  根据当前分支的merge参数，设置revisionExpr和revisionId
   """
   def PreSync(self):
     """
@@ -3742,6 +3759,11 @@ class MetaProject(Project):
     except OSError:
       return 0
 
+  """
+  检查是否有远程修改尚未被合并到本地
+
+  通过检查HEAD和revisionExpr引用指向的commit id是否有差异来确认remote分支是否有本地没有合并的提交
+  """
   @property
   def HasChanges(self):
     """Has the remote received new commits not yet checked out?
@@ -3749,6 +3771,10 @@ class MetaProject(Project):
     if not self.remote or not self.revisionExpr:
       return False
 
+    """
+    提取revisionExpr或revisionId所指向的具体commit id并保存到revid
+    查找HEAD引用对应的commit id并保存到head
+    """
     all_refs = self.bare_ref.all
     revid = self.GetRevisionId(all_refs)
     head = self.work_git.GetHead()
@@ -3758,6 +3784,11 @@ class MetaProject(Project):
       except KeyError:
         head = None
 
+    """
+    将得到的两个commit id(revid和head)进行比较，
+    如果二者一样，说明当前remote源中的分支相对于本地代码没有新的提交
+    如果不一样，则尝试获取从HEAD版本到revid之间的提交列表，如果取到了这样一个列表，那说明之间是有差异的。
+    """
     if revid == head:
       return False
     elif self._revlist(not_rev(HEAD), revid):
