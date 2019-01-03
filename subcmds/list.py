@@ -83,6 +83,25 @@ This is similar to running: repo forall -c 'echo "$REPO_PATH : $REPO_PROJECT"'.
 
   """
   'repo list'命令中'list'操作的主函数。
+
+  返回符合查找条件的project列表，如：
+  1. 列举名字或路径中包含'sdk'字符串的project
+  $ repo list -r sdk
+  external/dng_sdk : platform/external/dng_sdk
+  prebuilts/sdk : platform/prebuilts/sdk
+  sdk : platform/sdk
+
+  2. 列举名字中包含'sdk'字符串的project
+  $ repo list -r sdk -n
+  platform/external/dng_sdk
+  platform/prebuilts/sdk
+  platform/sdk
+
+  3. 列举路径中包含'sdk'字符串的project
+  $ repo list -r sdk -p
+  external/dng_sdk
+  prebuilts/sdk
+  sdk
   """
   def Execute(self, opt, args):
     """List all projects and the associated directories.
@@ -116,24 +135,6 @@ This is similar to running: repo forall -c 'echo "$REPO_PATH : $REPO_PROJECT"'.
 
     """
     将按照条件查找得到的project按格式整理存放到lines列表中，用于格式化输出。
-    如：
-    1. 列举名字或路径中包含'sdk'字符串的project
-    $ repo list -r sdk
-    external/dng_sdk : platform/external/dng_sdk
-    prebuilts/sdk : platform/prebuilts/sdk
-    sdk : platform/sdk
-
-    2. 列举名字中包含'sdk'字符串的project
-    $ repo list -r sdk -n
-    platform/external/dng_sdk
-    platform/prebuilts/sdk
-    platform/sdk
-
-    3. 列举路径中包含'sdk'字符串的project
-    $ repo list -r sdk -p
-    external/dng_sdk
-    prebuilts/sdk
-    sdk
     """
     lines = []
     for project in projects:
