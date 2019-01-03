@@ -25,7 +25,18 @@ from error import InvalidProjectGroupsError
 
 
 """
-所有repo命令的基类
+Command类为所有repo命令的基类，用于command操作的调用，其公开的接口包括：
+成员变量:
+  common
+  manifest
+成员函数:
+  WantPager(_opt)
+  ReadEnvironmentOptions(opts)
+  OptionParser()
+  Usage()
+  Execute(opt, args)
+  GetProjects(args, manifest=None, groups='', missing_ok=False, submodules_ok=False)
+  FindProjects(args, inverse=False)
 """
 class Command(object):
   """Base class for any command line action in repo.
@@ -198,6 +209,9 @@ class Command(object):
         pass
     return project
 
+  """
+  根据传入的参数，返回manifest中所有满足条件的project节点。
+  """
   def GetProjects(self, args, manifest=None, groups='', missing_ok=False,
                   submodules_ok=False):
     """A list of projects that match the arguments.
@@ -209,6 +223,11 @@ class Command(object):
 
     mp = manifest.manifestProject
 
+    """
+    如果没有指定groups，则读取'.repo/manifests/.git/config'中的'manifest.groups'属性。
+
+    如果配置文件中不存在groups属性，则默认groups为'default,platform-linux'属性(针对linux平台)
+    """
     if not groups:
       groups = mp.config.GetString('manifest.groups')
     if not groups:
