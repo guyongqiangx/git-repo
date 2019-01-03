@@ -141,6 +141,10 @@ class _Repo(object):
           glob = argv[:i]
         argv = argv[i + 1:]
         break
+    """
+    如果'repo'操作没有指定操作的name，会将其转换为'repo help'
+    例如： 'repo --version' 解析得到的name=None，会被转换为'repo --version help'
+    """
     if not name:
       glob = argv
       name = 'help'
@@ -155,6 +159,9 @@ class _Repo(object):
       --trace         trace git command execution
       --time          time repo command execution
       --version       display this version of repo
+
+    另外，当指定'--version'时，gopts.show_version=True，而'git'不带命令的情况下会被转换为'git help'执行。
+    所以'git --version'和'git version'的操作是一样的。
     """
     gopts, _gargs = global_options.parse_args(glob)
 
