@@ -619,6 +619,9 @@ def _Main(argv):
   _CheckWrapperVersion(opt.wrapper_version, opt.wrapper_path)
   _CheckRepoDir(opt.repodir)
 
+  """
+  更新Version的变量，在subcmds\version.py中获取repo脚本版本时使用
+  """
   Version.wrapper_version = opt.wrapper_version
   Version.wrapper_path = opt.wrapper_path
 
