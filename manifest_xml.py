@@ -313,6 +313,9 @@ class XmlManifest(object):
   def _ParseGroups(self, groups):
     return [x for x in re.split(r'[,\s]+', groups) if x]
 
+  """
+  将当前manifest的内容输出到fd指定的文件中
+  """
   def Save(self, fd, peg_rev=False, peg_rev_upstream=True, groups=None):
     """Write the current manifest out to the given file descriptor.
     """
