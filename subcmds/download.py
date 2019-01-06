@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2008 The Android Open Source Project
 #
@@ -22,6 +23,26 @@ from error import GitError
 
 CHANGE_RE = re.compile(r'^([1-9][0-9]*)(?:[/\.-]([1-9][0-9]*))?$')
 
+"""
+$ repo help download
+
+Summary
+-------
+Download and checkout a change
+
+Usage: repo download {project change[/patchset]}...
+
+Options:
+  -h, --help         show this help message and exit
+  -c, --cherry-pick  cherry-pick instead of checkout
+  -r, --revert       revert instead of checkout
+  -f, --ff-only      force fast-forward merge
+
+Description
+-----------
+The 'repo download' command downloads a change from the review system
+and makes it available in your project's local working directory.
+"""
 class Download(Command):
   common = True
   helpSummary = "Download and checkout a change"
@@ -33,6 +54,9 @@ The '%prog' command downloads a change from the review system and
 makes it available in your project's local working directory.
 """
 
+  """
+  定义'repo download'命令的参数选项
+  """
   def _Options(self, p):
     p.add_option('-c', '--cherry-pick',
                  dest='cherrypick', action='store_true',
@@ -66,6 +90,9 @@ makes it available in your project's local working directory.
         project = self.GetProjects([a])[0]
     return to_get
 
+  """
+  'repo download'命令中'download'操作的主函数。
+  """
   def Execute(self, opt, args):
     for project, change_id, ps_id in self._ParseChangeIds(args):
       dl = project.DownloadPatchSet(change_id, ps_id)

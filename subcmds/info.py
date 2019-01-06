@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2012 The Android Open Source Project
 #
@@ -22,11 +23,31 @@ class _Coloring(Coloring):
   def __init__(self, config):
     Coloring.__init__(self, config, "status")
 
+"""
+$ repo help info
+
+Summary
+-------
+Get info on the manifest branch, current branch or unmerged branches
+
+Usage: repo info [-dl] [-o [-b]] [<project>...]
+
+Options:
+  -h, --help            show this help message and exit
+  -d, --diff            show full info and commit diff including remote
+                        branches
+  -o, --overview        show overview of all local commits
+  -b, --current-branch  consider only checked out branches
+  -l, --local-only      Disable all remote operations
+"""
 class Info(PagedCommand):
   common = True
   helpSummary = "Get info on the manifest branch, current branch or unmerged branches"
   helpUsage = "%prog [-dl] [-o [-b]] [<project>...]"
 
+  """
+  定义'repo info'命令的参数选项
+  """
   def _Options(self, p):
     p.add_option('-d', '--diff',
                  dest='all', action='store_true',
@@ -41,7 +62,9 @@ class Info(PagedCommand):
                  dest="local", action="store_true",
                  help="Disable all remote operations")
 
-
+  """
+  'repo info'命令中'info'操作的主函数。
+  """
   def Execute(self, opt, args):
     self.out = _Coloring(self.manifest.globalConfig)
     self.heading = self.out.printer('heading', attr = 'bold')

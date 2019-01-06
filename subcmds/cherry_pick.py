@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2010 The Android Open Source Project
 #
@@ -21,6 +22,24 @@ from git_command import GitCommand
 
 CHANGE_ID_RE = re.compile(r'^\s*Change-Id: I([0-9a-f]{40})\s*$')
 
+"""
+$ repo help cherry-pick
+
+Summary
+-------
+Cherry-pick a change.
+
+Usage: repo cherry-pick <sha1>
+
+Options:
+  -h, --help  show this help message and exit
+
+Description
+-----------
+'repo cherry-pick' cherry-picks a change from one branch to another. The
+change id will be updated, and a reference to the old change id will be
+added.
+"""
 class CherryPick(Command):
   common = True
   helpSummary = "Cherry-pick a change."
@@ -33,9 +52,15 @@ The change id will be updated, and a reference to the old
 change id will be added.
 """
 
+  """
+  定义'repo cherry-pick'命令的参数选项
+  """
   def _Options(self, p):
     pass
 
+  """
+  'repo cherry-pick'命令中'cherry-pick'操作的主函数。
+  """
   def Execute(self, opt, args):
     if len(args) != 1:
       self.Usage()

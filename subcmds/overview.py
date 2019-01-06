@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2012 The Android Open Source Project
 #
@@ -17,7 +18,29 @@ from __future__ import print_function
 from color import Coloring
 from command import PagedCommand
 
+"""
+$ repo help overview
 
+Summary
+-------
+Display overview of unmerged project branches
+
+Usage: repo overview [--current-branch] [<project>...]
+
+Options:
+  -h, --help            show this help message and exit
+  -b, --current-branch  Consider only checked out branches
+
+Description
+-----------
+The 'repo overview' command is used to display an overview of the
+projects branches, and list any local commits that have not yet been
+merged into the project.
+
+The -b/--current-branch option can be used to restrict the output to
+only branches currently checked out in each project. By default, all
+branches are displayed.
+"""
 class Overview(PagedCommand):
   common = True
   helpSummary = "Display overview of unmerged project branches"
@@ -33,11 +56,17 @@ branches currently checked out in each project.  By default, all branches
 are displayed.
 """
 
+  """
+  定义'repo overview'命令的参数选项
+  """
   def _Options(self, p):
     p.add_option('-b', '--current-branch',
                  dest="current_branch", action="store_true",
                  help="Consider only checked out branches")
 
+  """
+  'repo overview'命令中'overview'操作的主函数。
+  """
   def Execute(self, opt, args):
     all_branches = []
     for project in self.GetProjects(args):
