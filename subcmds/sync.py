@@ -898,7 +898,8 @@ later is required to fix a server side protocol bug.
                 e, file=sys.stderr)
 
     """
-    PreSync()操作准备'.repo/repo'和'.repo/manifests'库当前分支同步所需的merge参数
+    PreSync()提取'.repo/repo'和'.repo/manifests'库的'.git/config'文件中当前分支的merge参数
+    并设置repo和manifest对象用于同步的revisionExpr和revisionId参数
     """
     rp = self.manifest.repoProject
     rp.PreSync()
@@ -922,7 +923,8 @@ later is required to fix a server side protocol bug.
                           optimized_fetch=opt.optimized_fetch)
 
     """
-    如果检测到manifest库有更新，执行manifest库本地的更新工作，使其在同步开始时保持最新的状态
+    如果检测到manifest库有更新(即remote分支还包含有本地分支没有合并的修改)
+    执行manifest库本地的更新工作，使其在代码同步开始时保持最新的状态
     """
     if mp.HasChanges:
       syncbuf = SyncBuffer(mp.config)
