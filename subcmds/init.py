@@ -333,7 +333,7 @@ to update the working directory files.
 
       例如，基于原来的master分支同步或同步到一个新的分支上:
       如果有指定新的分支'manifest_branch'，则设置分支引用参数用于同步;
-      如果没有指定新的分支，则PreSync()操作会基于manifest库'.git/config'中当前branch的merge属性设置分支引用参数用于同步;
+      如果没有指定新的分支，则PreSync()操作会基于manifest库当前branch的merge属性设置分支引用参数(revisionExpr和revisionId)用于同步;
       """
       if opt.manifest_branch:
         m.revisionExpr = opt.manifest_branch
