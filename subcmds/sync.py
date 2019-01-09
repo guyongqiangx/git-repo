@@ -602,6 +602,11 @@ later is required to fix a server side protocol bug.
       print('\nerror: Exited sync due to gc errors', file=sys.stderr)
       sys.exit(1)
 
+  """
+  使用manifest_name指定的manifest信息进行加载
+
+  如果没有指定manifest_name，则清空项目的manifest信息。
+  """
   def _ReloadManifest(self, manifest_name=None):
     if manifest_name:
       # Override calls _Unload already
@@ -609,12 +614,18 @@ later is required to fix a server side protocol bug.
     else:
       self.manifest._Unload()
 
+  """
+  删除path路径指定的project
+  """
   def _DeleteProject(self, path):
     print('Deleting obsolete path %s' % path, file=sys.stderr)
 
     # Delete the .git directory first, so we're less likely to have a partially
     # working git repository around. There shouldn't be any git projects here,
     # so rmtree works.
+    """
+    先删除'path/.git'目录
+    """
     try:
       shutil.rmtree(os.path.join(path, '.git'))
     except OSError:
@@ -625,8 +636,16 @@ later is required to fix a server side protocol bug.
 
     # Delete everything under the worktree, except for directories that contain
     # another git project
+    """
+    删除工作目录下的所有文件和目录，如果有目录包含其他的git项目，则保留该目录
+    """
     dirs_to_remove = []
     failed = False
+    """
+    通过os.walk(path)操作，dirs包含root路径下的目录列表，files包含root路径下的文件列表
+
+    以下操作先删除每个路径下的文件，然后删除该路径下所有非'.git'的目录。
+    """
     for root, dirs, files in os.walk(path):
       for f in files:
         try:
@@ -634,10 +653,17 @@ later is required to fix a server side protocol bug.
         except OSError:
           print('Failed to remove %s' % os.path.join(root, f), file=sys.stderr)
           failed = True
+      """
+      dirs保存非'.git'目录
+      dirs_to_remove保存所有待删除目录的路径
+      """
       dirs[:] = [d for d in dirs
                  if not os.path.lexists(os.path.join(root, d, '.git'))]
       dirs_to_remove += [os.path.join(root, d) for d in dirs
                          if os.path.join(root, d) not in dirs_to_remove]
+    """
+    逐个删除dirs_to_remove列表中的目录
+    """
     for d in reversed(dirs_to_remove):
       if os.path.islink(d):
         try:
@@ -657,6 +683,9 @@ later is required to fix a server side protocol bug.
       print('       remove manually, then run sync again', file=sys.stderr)
       return -1
 
+    """
+    逐级往上删除目录，直到顶层包含'.repo'目录的目录
+    """
     # Try deleting parent dirs if they are empty
     project_dir = path
     while project_dir != self.manifest.topdir:
