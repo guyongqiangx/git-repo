@@ -524,6 +524,9 @@ class XmlManifest(object):
   def IsArchive(self):
     return self.manifestProject.config.GetBoolean('repo.archive')
 
+  """
+  _Load()的反操作，清空项目的manifest信息。
+  """
   def _Unload(self):
     self._loaded = False
     self._projects = {}
