@@ -819,7 +819,7 @@ later is required to fix a server side protocol bug.
       self.manifest.manifestProject.worktree, smart_sync_manifest_name)
 
     """
-    ’repo init'操作中有指定'-s'/'-t'参数时，使用'smart_sync'或'smart_tag'的方式同步。
+    'repo init'操作中有指定'-s'/'-t'参数时，使用'smart_sync'或'smart_tag'的方式同步。
     """
     if opt.smart_sync or opt.smart_tag:
       if not self.manifest.manifest_server:
@@ -1066,7 +1066,13 @@ later is required to fix a server side protocol bug.
     if self.manifest.notice:
       print(self.manifest.notice)
 
+"""
+执行同步后的一些后续操作，主要是从'repo/.git/hooks'下更新hook脚本
+"""
 def _PostRepoUpgrade(manifest, quiet=False):
+  """
+  Wrapper模块指向repo库下的'./repo/repo/repo'文件
+  """
   wrapper = Wrapper()
   if wrapper.NeedSetupGnuPG():
     wrapper.SetupGnuPG(quiet)
@@ -1092,7 +1098,31 @@ def _PostRepoFetch(rp, no_repo_verify=False, verbose=False):
       print('repo version %s is current' % rp.work_git.describe(HEAD),
             file=sys.stderr)
 
+"""
+使用'git tag -v'命令去验证当前是否为gnupg key签署的版本。
+
+例如git-repo库的'stable'分支：
+  $ git log -1 --oneline refs/remotes/origin/stable
+  eceeb1b Support broken symlinks when cleaning obsolete paths
+  $ git describe eceeb1b
+  v1.12.37
+  $ GNUPGHOME=~/.repoconfig/gnupg git tag -v v1.12.37
+  object eceeb1b1f5edb0f42e690bffdf81828abd8ea7fe
+  type commit
+  tag v1.12.37
+  tagger Dan Willemsen <dwillemsen@google.com> 1475173621 -0700
+
+  repo v1.12.37
+  gpg: Signature made Fri 30 Sep 2016 02:27:01 AM CST using DSA key ID 920F5C65
+  gpg: Good signature from "Repo Maintainer <repo@android.kernel.org>"
+  gpg: WARNING: This key is not certified with a trusted signature!
+  gpg:          There is no indication that the signature belongs to the owner.
+  Primary key fingerprint: 8BB9 AD79 3E8E 6153 AF0F  9A44 1653 0D5E 920F 5C65
+"""
 def _VerifyTag(project):
+  """
+  获取用户的gnupg目录
+  """
   gpg_dir = os.path.expanduser('~/.repoconfig/gnupg')
   if not os.path.exists(gpg_dir):
     print('warning: GnuPG was not available during last "repo init"\n'
@@ -1100,11 +1130,22 @@ def _VerifyTag(project):
           file=sys.stderr)
     return True
 
+  """
+  执行: 'git describe rev'命令，查找离rev提交最近的tag，如果本身是tag，则返回tag的名称
+  如：
+    $ git describe 44b59e19
+    v1.12.37-63-g44b59e1
+    $ git describe eceeb1b1f
+    v1.12.37
+  """
   try:
     cur = project.bare_git.describe(project.GetRevisionId())
   except GitError:
     cur = None
 
+  """
+  如果没有找到tag，或者tag属于'v1.12.37-63-g44b59e1'这样的格式，则提示包含版本号的错误信息。
+  """
   if not cur \
      or re.compile(r'^.*-[0-9]{1,}-g[0-9a-f]{1,}$').match(cur):
     rev = project.revisionExpr
@@ -1116,6 +1157,22 @@ def _VerifyTag(project):
           % (project.name, rev), file=sys.stderr)
     return False
 
+  """
+  构造并执行命令：'GIT_DIR=xxx/.git GNUPGHOME=~/.repoconfig/gnupg git tag -v cur'
+  以git-repo库的v1.12.37为例：
+    $ GIT_DIR=.git GNUPGHOME=~/.repoconfig/gnupg git tag -v v1.12.37
+    object eceeb1b1f5edb0f42e690bffdf81828abd8ea7fe
+    type commit
+    tag v1.12.37
+    tagger Dan Willemsen <dwillemsen@google.com> 1475173621 -0700
+
+    repo v1.12.37
+    gpg: Signature made Fri 30 Sep 2016 02:27:01 AM CST using DSA key ID 920F5C65
+    gpg: Good signature from "Repo Maintainer <repo@android.kernel.org>"
+    gpg: WARNING: This key is not certified with a trusted signature!
+    gpg:          There is no indication that the signature belongs to the owner.
+    Primary key fingerprint: 8BB9 AD79 3E8E 6153 AF0F  9A44 1653 0D5E 920F 5C65
+  """
   env = os.environ.copy()
   env['GIT_DIR'] = project.gitdir.encode()
   env['GNUPGHOME'] = gpg_dir.encode()
