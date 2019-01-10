@@ -287,6 +287,9 @@ class GitConfig(object):
     if value is None:
       if old:
         del self._cache[key]
+        """
+        命令：'git config --file $file --unset-all $name'
+        """
         self._do('--unset-all', name)
 
     elif isinstance(value, list):
@@ -301,12 +304,21 @@ class GitConfig(object):
 
       elif old != value:
         self._cache[key] = list(value)
+        """
+        命令：'git config --file $file --replace-all $name $value[0]'
+        """
         self._do('--replace-all', name, value[0])
+        """
+        命令：'git config --file $file --add $name $value[i]'
+        """
         for i in range(1, len(value)):
           self._do('--add', name, value[i])
 
     elif len(old) != 1 or old[0] != value:
       self._cache[key] = [value]
+      """
+      命令：'git config --file $file $name $value'
+      """
       self._do('--replace-all', name, value)
 
   """
@@ -578,6 +590,10 @@ class GitConfig(object):
 
     最后将分割得到的键值对(key, value)存放到c列表中。
     """
+
+    """
+    命令：'git config --file $file --null --list'
+    """
     d = self._do('--null', '--list')
     if d is None:
       return c
@@ -601,7 +617,7 @@ class GitConfig(object):
   """
   def _do(self, *args):
     """
-    构造命令：'git config --file file key value'
+    构造命令：'git config --file $file $key $value'
 
     这里的file可能是用户级别的'~/.gitconfig'或仓库级别的'.git/config':
 
