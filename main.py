@@ -102,6 +102,16 @@ global_options.add_option('--version',
                           dest='show_version', action='store_true',
                           help='display this version of repo')
 
+"""
+封装所有repo命令的_Repo类。
+构造函数:
+  _Repo(repodir)
+成员变量：
+  repodir  : 指向'.repo'目录的路径
+  commands : 所有的repo子命令
+成员函数:
+  _Run(argv)
+"""
 class _Repo(object):
   """
   使用.repo目录的路径(如'/path/to/test/.repo')初始化_Repo的类对象
@@ -279,6 +289,9 @@ class _Repo(object):
     return result
 
 
+"""
+返回".repo/repo/main.py"文件所在的目录路径
+"""
 def _MyRepoPath():
   return os.path.dirname(__file__)
 
