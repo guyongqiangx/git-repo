@@ -175,6 +175,10 @@ if (ver[0], ver[1]) < MIN_PYTHON_VERSION:
          % sys.version.split(' ')[0], file=sys.stderr)
   sys.exit(1)
 
+"""
+home_dot_repo = '~/.repoconfig'
+      gpg_dir = '~/.repoconfig/gnupg'
+"""
 home_dot_repo = os.path.expanduser('~/.repoconfig')
 gpg_dir = os.path.join(home_dot_repo, 'gnupg')
 
@@ -367,17 +371,19 @@ def _Init(args, gitc_init=False):
   并添加如下参数到extra_args:
   '--repo-url=https://gerrit.googlesource.com/git-repo --repo-branch=stable'
 
-  1. 如果没有指定repo-url, 则使用系统默认的REPO_URL设置。
-  2. 如果没有指定repo-branch, 则使用系统默认的REPO_REV设置
+  1. 如果没有指定repo-url, 则使用系统默认的REPO_URL设置，即'https://gerrit.googlesource.com/git-repo'源。
+  2. 如果没有指定repo-branch, 则使用系统默认的REPO_REV设置，即'stable'分支
 
   repo_url的设置优先级如下：
     1. '--repo-url'选项
     2. 环境变量'REPO_URL'
     3. google官方地址: ''https://gerrit.googlesource.com/git-repo'
+  默认参数：'--repo-url=https://gerrit.googlesource.com/git-repo'
 
   repo_branch的设置优先级如下：
     1. '--repo-branch'选项
     2. 'stable'分支
+  默认参数：'--repo-branch=stable'
   """
   url = opt.repo_url
   if not url:
@@ -450,7 +456,7 @@ def _Init(args, gitc_init=False):
   """
   余下代码执行以下操作:
   1. 检查git版本是否大于1.7.2
-  2. 设置GnuPG验证环境
+  2. 设置GnuPG验证环境，主要是检查'~/.repoconfig/gnupg'下面是否存在gpg key
   3. 调用_Clone()将url指定的远程repo库复制到本地
   4. 只用GnuPG的key对制定的branch进行校验
   5. 检出branch指定的分支，默认检出'stable'分支
@@ -462,6 +468,9 @@ def _Init(args, gitc_init=False):
     else:
       can_verify = True
 
+    """
+    dst = '/path/for/test/.repo/repo'
+    """
     dst = os.path.abspath(os.path.join(repodir, S_repo))
     """
     复制远程的repo库到本地，如：
@@ -472,6 +481,9 @@ def _Init(args, gitc_init=False):
     _Clone(url, dst, opt.quiet, not opt.no_clone_bundle)
 
     if can_verify and not opt.no_repo_verify:
+      """
+      调用 _Verify('/path/for/test/.repo/repo', 'stable', opt.quiet)
+      """
       rev = _Verify(dst, branch, opt.quiet)
     else:
       rev = 'refs/remotes/origin/%s^0' % branch
@@ -550,8 +562,15 @@ def _CheckGitVersion():
     _print('fatal: git %s or later required' % need, file=sys.stderr)
     raise CloneFailure()
 
+"""
+读取配置文件信息判断是否需要设置GnuPG Key
 
+读取文件'~/.repoconfig/keyring-version'的内容并检查其值是否小于KEYRING_VERSION (1.2)
+"""
 def NeedSetupGnuPG():
+  """
+  1. 检查"~/.repoconfig"目录及"~/.repoconfig/keyring-version"文件是否存在
+  """
   if not os.path.isdir(home_dot_repo):
     return True
 
@@ -559,6 +578,11 @@ def NeedSetupGnuPG():
   if not os.path.exists(kv):
     return True
 
+  """
+  2. 读取文件'~/.repoconfig/keyring-version'的内容
+  $ cat ~/.repoconfig/keyring-version
+  1.2
+  """
   kv = open(kv).read()
   if not kv:
     return True
@@ -570,6 +594,9 @@ def NeedSetupGnuPG():
 
 
 def SetupGnuPG(quiet):
+  """
+  1. 'mkdir ~/.repoconfig'
+  """
   try:
     os.mkdir(home_dot_repo)
   except OSError as e:
@@ -578,6 +605,9 @@ def SetupGnuPG(quiet):
              % (home_dot_repo, e.strerror), file=sys.stderr)
       sys.exit(1)
 
+  """
+  2. 'mkdir ~/.repoconfig/gnupg'
+  """
   try:
     os.mkdir(gpg_dir, stat.S_IRWXU)
   except OSError as e:
@@ -586,6 +616,9 @@ def SetupGnuPG(quiet):
              file=sys.stderr)
       sys.exit(1)
 
+  """
+  构造并执行命令：'GNUPGHOME=~/.repoconfig/gnupg gpg --import'，写入本文件开头提供的gpg key数据MAINTAINER_KEYS
+  """
   env = os.environ.copy()
   try:
     env['GNUPGHOME'] = gpg_dir
@@ -612,14 +645,22 @@ def SetupGnuPG(quiet):
     sys.exit(1)
   _print()
 
+  """
+  更新'~/.repconfig/keyring-version'的内容，写入KEYRING_VERSION数据。
+  """
   fd = open(os.path.join(home_dot_repo, 'keyring-version'), 'w')
   fd.write('.'.join(map(str, KEYRING_VERSION)) + '\n')
   fd.close()
   return True
 
-
+"""
+往'.git/config'文件中写入键值对name=value
+"""
 def _SetConfig(local, name, value):
   """Set a git configuration option to the specified value.
+  """
+  """
+  命令：'git config $name $value'
   """
   cmd = [GIT, 'config', name, value]
   if subprocess.Popen(cmd, cwd=local).wait() != 0:
@@ -888,9 +929,26 @@ def _Clone(url, local, quiet, clone_bundle):
     _ImportBundle(local)
   _Fetch(url, local, 'origin', quiet)
 
-
+"""
+使用'git tag -v'命令去验证当前是否为gnupg key签署的版本。
+"""
 def _Verify(cwd, branch, quiet):
   """Verify the branch has been signed by a tag.
+  """
+  """
+  对于默认的'stable'分支，构造命令：'git describe origin/stable'来查找该分支最近的tag, 并将命令的输出存放到cur中。
+
+  如果分支引用刚好位于tag上，则显示tag名称，如：
+  $ git describe origin/stable 
+  v1.12.37
+
+  如果引用没有在tag上，则显示最近的tag和tag之上的commit数量，以及当前提交的id，如：
+  $ git describe comments
+  v1.12.37-64-g585eb83
+  说明：
+  - v1.12.37, 当前comments分支上最近的tag
+  - 64, comments分支的HEAD位于该tag以来的64个提交上
+  - g585eb83, 最新的提交id为585eb83
   """
   cmd = [GIT, 'describe', 'origin/%s' % branch]
   proc = subprocess.Popen(cmd,
@@ -908,6 +966,10 @@ def _Verify(cwd, branch, quiet):
     _print("fatal: branch '%s' has not been signed" % branch, file=sys.stderr)
     raise CloneFailure()
 
+  """
+  检查'git describe'命令的输出。
+  如果满足类似 v1.12.37-64-g585eb83 的格式，则切换到其tag v1.12.37上。 即：cur=m.group(1)='v1.12.37'
+  """
   m = re.compile(r'^(.*)-[0-9]{1,}-g[0-9a-f]{1,}$').match(cur)
   if m:
     cur = m.group(1)
@@ -917,6 +979,22 @@ def _Verify(cwd, branch, quiet):
              % (branch, cur), file=sys.stderr)
       _print(file=sys.stderr)
 
+  """
+  构造并执行命令：'GNUPGHOME=~/.repoconfig/gnupg git tag -v cur'
+  以git-repo库的v1.12.37为例：
+    $ GNUPGHOME=~/.repoconfig/gnupg git tag -v v1.12.37
+    object eceeb1b1f5edb0f42e690bffdf81828abd8ea7fe
+    type commit
+    tag v1.12.37
+    tagger Dan Willemsen <dwillemsen@google.com> 1475173621 -0700
+
+    repo v1.12.37
+    gpg: Signature made Fri 30 Sep 2016 02:27:01 AM CST using DSA key ID 920F5C65
+    gpg: Good signature from "Repo Maintainer <repo@android.kernel.org>"
+    gpg: WARNING: This key is not certified with a trusted signature!
+    gpg:          There is no indication that the signature belongs to the owner.
+    Primary key fingerprint: 8BB9 AD79 3E8E 6153 AF0F  9A44 1653 0D5E 920F 5C65
+  """
   env = os.environ.copy()
   try:
     env['GNUPGHOME'] = gpg_dir
