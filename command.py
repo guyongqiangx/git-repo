@@ -184,7 +184,14 @@ class Command(object):
   def _UpdatePathToProjectMap(self, project):
     self._by_path[project.worktree] = project
 
+  """
+  返回manifest中对应于path路径的project
+  """
   def _GetProjectByPath(self, manifest, path):
+    """
+    _by_path成员是一个包含(path, project)键值对的字典，path是git库的工作目录路径。
+    通过_by_path[path]就能得到path对应的project
+    """
     project = None
     if os.path.exists(path):
       oldpath = None
@@ -210,11 +217,14 @@ class Command(object):
     return project
 
   """
-  根据传入的参数，返回manifest中所有满足条件的project节点。
+  根据传入的参数，返回manifest中name或path满足条件的project节点列表。
   """
   def GetProjects(self, args, manifest=None, groups='', missing_ok=False,
                   submodules_ok=False):
     """A list of projects that match the arguments.
+    """
+    """
+    将manifest中的project节点信息保存到all_projects_list中。
     """
     if not manifest:
       manifest = self.manifest
@@ -234,22 +244,45 @@ class Command(object):
       groups = 'default,platform-' + platform.system().lower()
     groups = [x for x in re.split(r'[,\s]+', groups) if x]
 
+    """
+    没有指定args对project过滤名字的情况下, 检查每个project是否有子模组，如果有，则将子模组也添加进projects列表中来。
+    """
     if not args:
       derived_projects = {}
+      """
+      依次检查各project是否有子模组project。
+      """
       for project in all_projects_list:
         if submodules_ok or project.sync_s:
           derived_projects.update((p.name, p)
                                   for p in project.GetDerivedSubprojects())
+      """
+      将所有子模组的project添加到projects列表中
+      """
       all_projects_list.extend(derived_projects.values())
+
+      """
+      对all_projects_list中的project按照组别groups进行筛选，并存放到result列表中。
+      """
       for project in all_projects_list:
         if (missing_ok or project.Exists) and project.MatchesGroups(groups):
           result.append(project)
     else:
+      """
+      指定了args参数的情况下，对所有project生成(worktree, project)键值对并保存到_by_path成员中，
+      便于后面根据args参数(可能使用正则表达式)筛选。
+      """
       self._ResetPathToProjectMap(all_projects_list)
 
       for arg in args:
+        """
+        返回manifest中name包含arg的project列表
+        """
         projects = manifest.GetProjectsWithName(arg)
 
+        """
+        如果没有name包含arg的project，尝试查找工作目录为arg的project
+        """
         if not projects:
           path = os.path.abspath(arg).replace('\\', '/')
           project = self._GetProjectByPath(manifest, path)
@@ -284,9 +317,17 @@ class Command(object):
     result.sort(key=_getpath)
     return result
 
+  """
+  返回manifest中name或path符合条件(可能是正则表达式)的project列表。
+
+  inverse选项指定是否为反向查找。
+  """
   def FindProjects(self, args, inverse=False):
     result = []
     patterns = [re.compile(r'%s' % a, re.IGNORECASE) for a in args]
+    """
+    在manifest包含的所有projects中查找name或relpath满足正则表达式的project列表。
+    """
     for project in self.GetProjects(''):
       for pattern in patterns:
         match = pattern.search(project.name) or pattern.search(project.relpath)
