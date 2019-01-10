@@ -1080,12 +1080,22 @@ def _PostRepoUpgrade(manifest, quiet=False):
     if project.Exists:
       project.PostRepoUpgrade()
 
+"""
+使用fetch拿到的数据更新repo库的工作目录
+"""
 def _PostRepoFetch(rp, no_repo_verify=False, verbose=False):
   if rp.HasChanges:
     print('info: A new version of repo is available', file=sys.stderr)
     print(file=sys.stderr)
+    """
+    如果指定'--no-repo-verify'，则不调用_VerifyTag(rp)验证，
+    否则会使用'~/.repoconfig/gnupg'下的gpg key去验证当前指定的分支。
+    """
     if no_repo_verify or _VerifyTag(rp):
       syncbuf = SyncBuffer(rp.config)
+      """
+      使用fetch到的数据更新repo的工作目录'.repo/repo'
+      """
       rp.Sync_LocalHalf(syncbuf)
       if not syncbuf.Finish():
         sys.exit(1)
@@ -1204,10 +1214,17 @@ class _FetchTimes(object):
     self._times = None
     self._seen = set()
 
+  """
+  返回'.repo/.repo_fetchtimes.json'中名为name的project的时间戳信息。
+  """
   def Get(self, project):
     self._Load()
     return self._times.get(project.name, _ONE_DAY_S)
 
+  """
+  更新内存中类对象的_times成员中名为name的project的时间戳信息。
+  怎么算的？完全不知道啊~~
+  """
   def Set(self, project, t):
     self._Load()
     name = project.name
@@ -1216,6 +1233,9 @@ class _FetchTimes(object):
     a = self._ALPHA
     self._times[name] = (a*t) + ((1-a) * old)
 
+  """
+  打开'.repo/.repo_fetchtimes.json'文件，并读取每个project的时间戳信息到_times中。
+  """
   def _Load(self):
     if self._times is None:
       try:
@@ -1231,6 +1251,9 @@ class _FetchTimes(object):
           pass
         self._times = {}
 
+  """
+  将内存中类对象成员_times的信息写回到'.repo/.repo_fetchtimes.json'文件中。
+  """
   def Save(self):
     if self._times is None:
       return
