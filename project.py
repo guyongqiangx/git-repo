@@ -1498,6 +1498,9 @@ class Project(object):
         pass
     return True
 
+  """
+  封装git库更新后的一些操作，主要是从'repo/.git/hooks'下更新hook脚本
+  """
   def PostRepoUpgrade(self):
     self._InitHooks()
 
@@ -2854,6 +2857,7 @@ class Project(object):
   def _InitHooks(self):
     """
     对于manifests库，其hooks 的值为 '.repo/manifest.git/hooks'
+    对应于其它库，hooks 为其'.git'目录下'hooks'文件夹路径: '/path/to/test/.git/hooks'。
     """
     hooks = os.path.realpath(self._gitdir_path('hooks'))
     if not os.path.exists(hooks):
@@ -2862,7 +2866,7 @@ class Project(object):
     _ProjectHooks()列举'repo/hooks'目录下的所有文件，存放到_project_hook_list的全局变量列表中并返回:
     _project_hook_list = ['.repo/repo/hooks/commit-msg', '.repo/repo/hooks/pre-auto-gc']
 
-    依次将'repo/hooks'下的文件链接到'manifest.git/hooks'目录下。
+    对于manifest库，则依次将'repo/hooks'下的文件链接到'manifest.git/hooks'目录下。
     """
     for stock_hook in _ProjectHooks():
       name = os.path.basename(stock_hook)
@@ -3040,6 +3044,12 @@ class Project(object):
         shutil.rmtree(dotgit)
       raise
 
+  """
+  返回path基于gitdir的路径
+
+  如: path='hooks'
+  返回 '/path/to/test/.git/hook'
+  """
   def _gitdir_path(self, path):
     return os.path.realpath(os.path.join(self.gitdir, path))
 
