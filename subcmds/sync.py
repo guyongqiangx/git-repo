@@ -407,6 +407,12 @@ later is required to fix a server side protocol bug.
                  dest='repo_upgraded', action='store_true',
                  help=SUPPRESS_HELP)
 
+  """
+  多线程进行sync操作时，_FetchProjectList()为多线程操作的主函数。
+  单线程操作时，直接使用_FetchProjectList()函数进行同步操作。
+
+  实际上将每一个project的操作都单独委托给_FetchHelper进行，所以多线程时_FetchHelper()需要做同步措施。
+  """
   def _FetchProjectList(self, opt, projects, *args, **kwargs):
     """Main function of the fetch threads when jobs are > 1.
 
@@ -423,6 +429,9 @@ later is required to fix a server side protocol bug.
       if not success and not opt.force_broken:
         break
 
+  """
+  _FetchHelper()操作单独同步某一个project
+  """
   def _FetchHelper(self, opt, project, lock, fetched, pm, sem, err_event):
     """Fetch git objects for a single project.
 
@@ -1006,7 +1015,14 @@ later is required to fix a server side protocol bug.
                                     missing_ok=True,
                                     submodules_ok=opt.fetch_submodules)
 
+    """
+    _fetch_times保存了manifest中所有project的fetch时间信息
+    """
     self._fetch_times = _FetchTimes(self.manifest)
+
+    """
+    如果没有指定'--local-only'选项，需要从远程repo仓库先进行fetch操作。
+    """
     if not opt.local_only:
       to_fetch = []
       now = time.time()
@@ -1016,6 +1032,9 @@ later is required to fix a server side protocol bug.
       to_fetch.sort(key=self._fetch_times.Get, reverse=True)
 
       fetched = self._Fetch(to_fetch, opt)
+      """
+      更新'.repo/repo'库的工作目录
+      """
       _PostRepoFetch(rp, opt.no_repo_verify)
       if opt.network_only:
         # bail out now; the rest touches the working tree
@@ -1081,7 +1100,7 @@ def _PostRepoUpgrade(manifest, quiet=False):
       project.PostRepoUpgrade()
 
 """
-使用fetch拿到的数据更新repo库的工作目录
+使用fetch拿到的数据更新repo自身库的工作目录
 """
 def _PostRepoFetch(rp, no_repo_verify=False, verbose=False):
   if rp.HasChanges:
