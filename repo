@@ -593,6 +593,9 @@ def NeedSetupGnuPG():
   return False
 
 
+"""
+向'~/.repoconfig/gnupg'目录写入本文件开始的MAINTAINER_KEYS数据。
+"""
 def SetupGnuPG(quiet):
   """
   1. 'mkdir ~/.repoconfig'
@@ -939,7 +942,7 @@ def _Verify(cwd, branch, quiet):
   对于默认的'stable'分支，构造命令：'git describe origin/stable'来查找该分支最近的tag, 并将命令的输出存放到cur中。
 
   如果分支引用刚好位于tag上，则显示tag名称，如：
-  $ git describe origin/stable 
+  $ git describe origin/stable
   v1.12.37
 
   如果引用没有在tag上，则显示最近的tag和tag之上的commit数量，以及当前提交的id，如：
