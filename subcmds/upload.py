@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2008 The Android Open Source Project
 #
@@ -56,6 +57,100 @@ def _SplitEmails(values):
     result.extend([s.strip() for s in value.split(',')])
   return result
 
+"""
+$ repo help upload
+
+Summary
+-------
+Upload changes for code review
+
+Usage: repo upload [--re --cc] [<project>]...
+
+Options:
+  -h, --help            show this help message and exit
+  -t                    Send local branch name to Gerrit Code Review
+  --re=REVIEWERS, --reviewers=REVIEWERS
+                        Request reviews from these people.
+  --cc=CC               Also send email to these email addresses.
+  --br=BRANCH           Branch to upload.
+  --cbr, --current-branch
+                        Upload current git branch.
+  -d, --draft           If specified, upload as a draft.
+  -D BRANCH, --destination=BRANCH, --dest=BRANCH
+                        Submit for review on this target branch.
+  --no-verify           Do not run the upload hook.
+  --verify              Run the upload hook without prompting.
+
+Description
+-----------
+The 'repo upload' command is used to send changes to the Gerrit Code
+Review system. It searches for topic branches in local projects that
+have not yet been published for review. If multiple topic branches are
+found, 'repo upload' opens an editor to allow the user to select which
+branches to upload.
+
+'repo upload' searches for uploadable changes in all projects listed at
+the command line. Projects can be specified either by name, or by a
+relative or absolute path to the project's local directory. If no
+projects are specified, 'repo upload' will search for uploadable changes
+in all projects listed in the manifest.
+
+If the --reviewers or --cc options are passed, those emails are added to
+the respective list of users, and emails are sent to any new users.
+Users passed as --reviewers must already be registered with the code
+review system, or the upload will fail.
+
+Configuration
+-------------
+review.URL.autoupload:
+
+To disable the "Upload ... (y/N)?" prompt, you can set a per-project or
+global Git configuration option. If review.URL.autoupload is set to
+"true" then repo will assume you always answer "y" at the prompt, and
+will not prompt you further. If it is set to "false" then repo will
+assume you always answer "n", and will abort.
+
+review.URL.autoreviewer:
+
+To automatically append a user or mailing list to reviews, you can set a
+per-project or global Git option to do so.
+
+review.URL.autocopy:
+
+To automatically copy a user or mailing list to all uploaded reviews,
+you can set a per-project or global Git option to do so. Specifically,
+review.URL.autocopy can be set to a comma separated list of reviewers
+who you always want copied on all uploads with a non-empty --re
+argument.
+
+review.URL.username:
+
+Override the username used to connect to Gerrit Code Review. By default
+the local part of the email address is used.
+
+The URL must match the review URL listed in the manifest XML file, or in
+the .git/config within the project. For example:
+
+  [remote "origin"]
+    url = git://git.example.com/project.git
+    review = http://review.example.com/
+
+  [review "http://review.example.com/"]
+    autoupload = true
+    autocopy = johndoe@company.com,my-team-alias@company.com
+
+review.URL.uploadtopic:
+
+To add a topic branch whenever uploading a commit, you can set a
+per-project or global Git option to do so. If review.URL.uploadtopic is
+set to "true" then repo will assume you always want the equivalent of
+the -t option to the repo command. If unset or set to "false" then repo
+will make use of only the command line option.
+
+References
+----------
+Gerrit Code Review: http://code.google.com/p/gerrit/
+"""
 class Upload(InteractiveCommand):
   common = True
   helpSummary = "Upload changes for code review"
