@@ -4,7 +4,7 @@
 # repo default configuration
 #
 """
-通过 REPO_URL/REPO_REV 指定clone的地址和分支
+通过 REPO_URL/REPO_REV 指定clone的地址(url)和分支(branch)
 1. 尝试获取环境变量'REPO_URL'的值，如果没有设置，则使用google官方地址
 2. 默认下载stable分支
 """
@@ -34,6 +34,13 @@ VERSION = (1, 23)
 # increment this if the MAINTAINER_KEYS block is modified
 KEYRING_VERSION = (1, 2)
 
+"""
+GnuPG Public Key数据, 这里包含两个Public Key数据
+
+作为命令'GNUPGHOME=~/.repoconfig/gnupg gpg --import'的输入，保存到'~/.repoconfig/gnupg/'目录下
+
+在调用'git tag -v'命令时，会验证指定的版本代码是否为这里的GnuPG Key签署。
+"""
 # Each individual key entry is created by using:
 # gpg --armor --export keyid
 MAINTAINER_KEYS = """
@@ -160,6 +167,9 @@ else:
   urllib.error = urllib2
 
 
+"""
+由于Python2和Python3的print调用格式不一样，所以这里使用write调用重新定义_print用于输出信息的处理。
+"""
 def _print(*objects, **kwargs):
   sep = kwargs.get('sep', ' ')
   end = kwargs.get('end', '\n')
@@ -167,6 +177,9 @@ def _print(*objects, **kwargs):
   out.write(sep.join(objects) + end)
 
 
+"""
+Python版本检查，Python 2.6以上版本
+"""
 # Python version check
 ver = sys.version_info
 if (ver[0], ver[1]) < MIN_PYTHON_VERSION:
@@ -176,6 +189,8 @@ if (ver[0], ver[1]) < MIN_PYTHON_VERSION:
   sys.exit(1)
 
 """
+指定repoconfig目录:
+
 home_dot_repo = '~/.repoconfig'
       gpg_dir = '~/.repoconfig/gnupg'
 """
@@ -524,11 +539,14 @@ def ParseGitVersion(ver_str):
 
 
 """
-检查git的版本号是否低于指定的(1,7,2)
+执行'git --version'命令并检查返回的版本号是否低于指定的(1,7,2)
 """
 def _CheckGitVersion():
   """
   构建并执行命令'git --version'
+
+  $ git --version
+  git version 1.9.1
   """
   cmd = [GIT, '--version']
   try:
@@ -543,19 +561,22 @@ def _CheckGitVersion():
     raise CloneFailure()
 
   """
-  捕获'git --version'命令的输出，并调用ParseGitVersion()进行解析，返回版本的三元组，如：(2,7,4)
+  捕获'git --version'命令的输出
   """
   ver_str = proc.stdout.read().strip()
   proc.stdout.close()
   proc.wait()
 
+  """
+  调用ParseGitVersion()解析version字符串('git version 1.9.1')，并返回版本的三元组，如：(1，9，1)
+  """
   ver_act = ParseGitVersion(ver_str)
   if ver_act is None:
     _print('error: "%s" unsupported' % ver_str, file=sys.stderr)
     raise CloneFailure()
 
   """
-  检查git的版本是否低于(1,7,2)
+  检查解析返回的版本是否低于(1,7,2)
   """
   if ver_act < MIN_GIT_VERSION:
     need = '.'.join(map(str, MIN_GIT_VERSION))
@@ -649,7 +670,7 @@ def SetupGnuPG(quiet):
   _print()
 
   """
-  更新'~/.repconfig/keyring-version'的内容，写入KEYRING_VERSION数据。
+  更新'~/.repconfig/keyring-version'，写入KEYRING_VERSION数据。
   """
   fd = open(os.path.join(home_dot_repo, 'keyring-version'), 'w')
   fd.write('.'.join(map(str, KEYRING_VERSION)) + '\n')
@@ -657,7 +678,7 @@ def SetupGnuPG(quiet):
   return True
 
 """
-往'.git/config'文件中写入键值对name=value
+往项目级别的config文件('.git/config')写入配置项name=value
 """
 def _SetConfig(local, name, value):
   """Set a git configuration option to the specified value.
