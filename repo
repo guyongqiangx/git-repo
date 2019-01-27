@@ -506,7 +506,18 @@ def _Init(args, gitc_init=False):
     """
     根据branch设置检出分支。
 
-    branch由传入的'--repo-branch'选项设置, 没有时默认为REPO_REV='stable'，所以默认会检出repo库的'stable'分支。
+    实际上，在repo库下载完成后，会调用_Checkout()函数，将remote的stable分支checkout为本地的default分支，例如:
+
+    .repo/repo$ git branch -av
+    * default               eceeb1b Support broken symlinks when cleaning obsolete paths
+      remotes/origin/maint  34acdd2 Fix ManifestParseError when first child node is comment
+      remotes/origin/master d26146d platform_utils: Fix exception handling in _walk_windows_impl
+      remotes/origin/stable eceeb1b Support broken symlinks when cleaning obsolete paths
+
+    上面'default'分支和'remote/origin/stable'分支基于同一个commit。
+
+    这里检出remote源'stable'分支为本地'default'分支的调用为:
+      _Checkout('/path/for/test/.repo/repo', 'stable', 'refs/remotes/origin/stable', opt.quiet)
     """
     _Checkout(dst, branch, rev, opt.quiet)
   except CloneFailure:
@@ -750,6 +761,13 @@ def _Fetch(url, local, src, quiet):
   if not quiet:
     _print('Get %s' % url, file=sys.stderr)
 
+  """
+  构造命令: 'git fetch --quiet $src <refspec>'，有两种情况:
+  1. remote源
+     'git fetch origin +refs/heads/*:refs/remotes/origin/* refs/tags/*:refs/tags/*'
+  2. clone.bundle源
+     'git fetch /path/to/git-repo/.git/clone.bundle +refs/heads/*:refs/remotes/origin/* refs/tags/*:refs/tags/*'
+  """
   cmd = [GIT, 'fetch']
   if quiet:
     cmd.append('--quiet')
@@ -1046,28 +1064,58 @@ def _Verify(cwd, branch, quiet):
   return '%s^0' % cur
 
 
+"""
+将指定分支$branch上版本为$rev的代码检出为本地'default'分支
+
+具体上，在cwd指定库上，基于$branch分支的$rev版本(也可以是引用)代码，将其checkout为本地名为的'default'分支。
+
+下载完repo库后，默认检出'remotes/origin/stable'分支为本地的'default'分支。
+"""
 def _Checkout(cwd, branch, rev, quiet):
   """Checkout an upstream branch into the repository and track it.
   """
   """
+  下载repo库后，默认检出'stable'分支的调用：
+    _Checkout('/path/for/test/.repo/repo', 'stable', 'refs/remotes/origin/stable', opt.quiet)
+    即:
+       cwd = '/path/for/test/.repo/repo'
+    branch = 'stable'
+       ref = 'refs/remotes/origin/stable' # 这里的版本为rev指向的引用
+     quiet = opt.quiet
+
   整个_Checkout()操作依次执行以下操作：
-  1. 'git update-ref refs/heads/default rev'
-  2. 'git config branch.default.remote origin'
-  3. 'git config branch.default.merge refs/heads/branch'
-  4. 'git symbolic-ref HEAD refs/heads/default'
-  5. 'git read-tree --reset -u -v HEAD'
+
+  1. 更新本地'default'分支的引用
+     'git update-ref refs/heads/default $rev'
+     注:
+     命令'git update-ref $ref <newvalue>', 将当前分支引用$ref更新为新对象<newvalue>
+     所以这里将'default'的分支引用更新为$ref指向的对象，即remote的'stable'分支'refs/remotes/origin/stable'
   """
   cmd = [GIT, 'update-ref', 'refs/heads/default', rev]
   if subprocess.Popen(cmd, cwd=cwd).wait() != 0:
     raise CloneFailure()
 
+  """
+  2. 设置本地'default'分支的remote和merge参数
+     'git config branch.default.remote origin'
+     'git config branch.default.merge refs/heads/$branch'
+  """
   _SetConfig(cwd, 'branch.default.remote', 'origin')
   _SetConfig(cwd, 'branch.default.merge', 'refs/heads/%s' % branch)
 
+  """
+  3. 更新HEAD头指针，使其指向'default'分支的引用'refs/heads/default'
+     'git symbolic-ref HEAD refs/heads/default'
+  """
   cmd = [GIT, 'symbolic-ref', 'HEAD', 'refs/heads/default']
   if subprocess.Popen(cmd, cwd=cwd).wait() != 0:
     raise CloneFailure()
 
+  """
+  4. 读取HEAD引用对应的树状提交信息到暂存区状态index文件
+     'git read-tree --reset -u -v HEAD'
+     注: 这里'git read-tree'命令没有指定'-m'参数，所以不会执行merge操作，原来暂存区的修改将会丢失
+  """
   cmd = [GIT, 'read-tree', '--reset', '-u']
   if not quiet:
     cmd.append('-v')
@@ -1321,12 +1369,20 @@ def _RunSelf(wrapper_path):
   return None, None
 
 
+"""
+使用gitdir路径指定的库更新REPO_URL和REPO_REV全局变量
+"""
 def _SetDefaultsTo(gitdir):
   global REPO_URL
   global REPO_REV
 
   """
-  执行：'git --git-dir=/path/to/test/.repo/repo/.git symbolic-ref HEAD'
+  执行: 'git --git-dir=/path/to/test/.repo/repo/.git symbolic-ref HEAD'
+
+  $ git symbolic-ref HEAD
+  refs/heads/comments
+
+  通过'git symbolic-ref HEAD'来得到HEAD引用指向的分支，并保存到REPO_REV中。
   """
   REPO_URL = gitdir
   proc = subprocess.Popen([GIT,
@@ -1426,10 +1482,17 @@ def main(orig_args):
       _NotInstalled()
     if cmd == 'init' or cmd == 'gitc-init':
       if my_git:
+        """
+        在'.git'目录存在的情况下，
+        调用: _SetDefaultsTo('/path/to/test/.repo/repo/.git')
+        更新全局的REPO_URL和REPO_REV，因此REPO_URL和REPO_REV指向实际的repo库地址和分支引用。
+        """
         _SetDefaultsTo(my_git)
       try:
         """
+        在'.git'目录不存在的情况下，
         调用: _Init(args=['-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1'], ...)
+        下载并初始化repo库。
         """
         _Init(args, gitc_init=(cmd == 'gitc-init'))
       except CloneFailure:
