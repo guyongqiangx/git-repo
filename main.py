@@ -127,7 +127,7 @@ class _Repo(object):
     all_commands['branch'] = all_commands['branches']
 
   """
-  执行具体的repo的子命令，例如：
+  _Run(argv)函数执行具体的repo的子命令，例如：
   init: argv = ['init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1']
   sync: argv = ['sync']
   """
@@ -151,6 +151,7 @@ class _Repo(object):
           glob = argv[:i]
         argv = argv[i + 1:]
         break
+
     """
     如果'repo'操作没有指定操作的name，会将其转换为'repo help'
     例如： 'repo --version' 解析得到的name=None，会被转换为'repo --version help'
@@ -159,6 +160,7 @@ class _Repo(object):
       glob = argv
       name = 'help'
       argv = []
+
     """
     解析main.py脚本中的参数项，包括:
     Options:
@@ -175,6 +177,9 @@ class _Repo(object):
     """
     gopts, _gargs = global_options.parse_args(glob)
 
+    """
+    如果命令行参数中有指定'--trace'，则调用SetTrace()使能_TRACE标识。
+    """
     if gopts.trace:
       SetTrace()
     if gopts.show_version:
@@ -184,18 +189,27 @@ class _Repo(object):
         print('fatal: invalid usage of --version', file=sys.stderr)
         return 1
 
+    """
+    默认情况下命令行没有传递"--color=COLOR"参数，所以颜色方案color为None，即什么都不做。
+    """
     SetDefaultColoring(gopts.color)
 
     """
     构建repo子命令执行的参数和环境
     """
     try:
+      """
+      获取repo子命令name对应的类对象cmd
+      """
       cmd = self.commands[name]
     except KeyError:
       print("repo: '%s' is not a repo command.  See 'repo help'." % name,
             file=sys.stderr)
       return 1
 
+    """
+    设置命令类对象cmd的属性，包括repodir和manifest
+    """
     cmd.repodir = self.repodir
     cmd.manifest = XmlManifest(cmd.repodir)
     cmd.gitc_manifest = None
@@ -208,17 +222,25 @@ class _Repo(object):
 
     """
     检查执行的命令，部分命令对环境有特殊要求:
+
+    1. mirror仓库需要执行MirrorSafeCommand
     """
     if not isinstance(cmd, MirrorSafeCommand) and cmd.manifest.IsMirror:
       print("fatal: '%s' requires a working directory" % name,
             file=sys.stderr)
       return 1
 
+    """
+    2. gitc的manifest目录下才能执行GitcAvailableCommand
+    """
     if isinstance(cmd, GitcAvailableCommand) and not gitc_utils.get_gitc_manifest_dir():
       print("fatal: '%s' requires GITC to be available" % name,
             file=sys.stderr)
       return 1
 
+    """
+    3. gitc客户端才能执行GitcClientCommand
+    """
     if isinstance(cmd, GitcClientCommand) and not gitc_client_name:
       print("fatal: '%s' requires a GITC client" % name,
             file=sys.stderr)
@@ -226,7 +248,7 @@ class _Repo(object):
 
     try:
       """
-      调用repo子命令的OptionParser对参数进行解析。
+      调用repo子命令cmd的OptionParser对参数进行解析。
       如'repo init': argv = ['-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1']
       如'repo sync': argv = []
 
@@ -252,8 +274,14 @@ class _Repo(object):
       if use_pager:
         RunPager(config)
 
+    """
+    start记录命令cmd执行前的时间戳
+    """
     start = time.time()
     try:
+      """
+      真正执行repo子命令cmd的地方，转到具体命令类去执行Execute()函数。
+      """
       result = cmd.Execute(copts, cargs)
     except (DownloadError, ManifestInvalidRevisionError,
         NoManifestException) as e:
@@ -276,6 +304,12 @@ class _Repo(object):
         print('error: project group must be enabled for the project in the current directory', file=sys.stderr)
       result = 1
     finally:
+      """
+      到这里命令执行结束，整理cmd命令执行的时间，如果带'--time'选项，则显示提示信息:
+      $ repo --time sync -l
+
+      real  0m0.091s
+      """
       elapsed = time.time() - start
       hours, remainder = divmod(elapsed, 3600)
       minutes, seconds = divmod(remainder, 60)
@@ -297,7 +331,7 @@ def _MyRepoPath():
 
 
 """
-比较单独执行的repo工具脚本与repo库中'.repo/repo/repo'脚本的版本，
+比较单独执行的repo工具脚本与repo库中'.repo/repo/repo'脚本(wrapper)的版本，
 如果二者版本不一致，提示相应的升级信息。
 
 _CheckWrapperVersion(ver='1.23', repo_path='/home/guyongqiang/bin/repo')
@@ -339,6 +373,12 @@ def _CheckWrapperVersion(ver, repo_path):
     cp %s %s
 """ % (exp_str, WrapperPath(), repo_path), file=sys.stderr)
 
+
+"""
+检查repo_dir参数是否为None
+
+如果传入的repo_dir没有设置，则显示信息: 'no --repo-dir argument'
+"""
 def _CheckRepoDir(repo_dir):
   if not repo_dir:
     print('no --repo-dir argument', file=sys.stderr)
@@ -346,6 +386,16 @@ def _CheckRepoDir(repo_dir):
 
 """
 从argv列表中'--'项前移除opt内的项
+
+main.py接收到的参数分为两部分, 如:
+  命令:'repo --time --trace sync -l'
+  argv = ['--repo-dir=/path/to/test/.repo',
+          '--wrapper-version=1.23',
+          '--wrapper-path=/home/guyongqiang/bin/repo',
+          '--',
+          'sync']
+
+  从上面可见，repo命令和子命令cmd之间使用'--'选项进行分割
 """
 def _PruneOptions(argv, opt):
   i = 0
@@ -364,6 +414,10 @@ def _PruneOptions(argv, opt):
 
 _user_agent = None
 
+"""
+返回基于当前环境的_user_agent字符串, 如:
+'git-repo/v1.12.37 (Linux) git/1.9.1 Python/2.7.6'
+"""
 def _UserAgent():
   global _user_agent
 
@@ -380,6 +434,11 @@ def _UserAgent():
     elif os_name == 'darwin':
       os_name = 'Darwin'
 
+    """
+    命令: 'git describe HEAD'
+    $ git describe HEAD
+    v1.12.37
+    """
     p = GitCommand(
       None, ['describe', 'HEAD'],
       cwd = _MyRepoPath(),
@@ -393,6 +452,9 @@ def _UserAgent():
     else:
       repo_version = 'unknown'
 
+    """
+    _user_agent = 'git-repo/v1.12.37 (Linux) git/1.9.1 Python/2.7.6'
+    """
     _user_agent = 'git-repo/%s (%s) git/%s Python/%d.%d.%d' % (
       repo_version,
       os_name,
@@ -627,7 +689,7 @@ def _Main(argv):
   检查单独的repo脚本和repo库中的repo脚本(wrapper)版本是否一致
   如果不一致，显示更新单独执行的repo脚本的提示信息
 
-  '--repo-dir'需要被设置为'.repo'目录的路径，检查是否已经设置。
+  '--repo-dir'需要被设置为'.repo'目录的路径，_CheckRepoDir()用于检查repodir是否已经设置。
   """
   _CheckWrapperVersion(opt.wrapper_version, opt.wrapper_path)
   _CheckRepoDir(opt.repodir)
@@ -650,6 +712,8 @@ def _Main(argv):
       将repo的子命令转入到_Repo对象中执行，例如：
       init: argv = ['init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1']
       sync: argv = ['sync']
+
+      !!! 这里才是真正执行repo子命令的地方
       """
       result = repo._Run(argv) or 0
     finally:
