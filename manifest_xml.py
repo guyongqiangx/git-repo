@@ -336,10 +336,16 @@ class XmlManifest(object):
     if groups:
       groups = self._ParseGroups(groups)
 
+    """
+    生成<manifest>根节点
+    """
     doc = xml.dom.minidom.Document()
     root = doc.createElement('manifest')
     doc.appendChild(root)
 
+    """
+    生成<manifest>根节点下的<notice>子节点
+    """
     # Save out the notice.  There's a little bit of work here to give it the
     # right whitespace, which assumes that the notice is automatically indented
     # by 4 by minidom.
@@ -351,12 +357,17 @@ class XmlManifest(object):
 
     d = self.default
 
+    """
+    生成<manifest>根节点下的<remote>子节点，每个remote一个节点
+    """
     for r in sorted(self.remotes):
       self._RemoteToXml(self.remotes[r], doc, root)
     if self.remotes:
       root.appendChild(doc.createTextNode(''))
 
     """
+    生成<manifest>根节点下的<default>子节点
+
     更新manifest.xml根节点下的'default'子节点
     如: <default remote="github" revision="master"/>
     """
@@ -385,7 +396,7 @@ class XmlManifest(object):
       root.appendChild(doc.createTextNode(''))
 
     """
-    更新manifest.xml根节点下的'manifest-server'子节点
+    生成<manifest>根节点下的<manifest-server>子节点
     """
     if self._manifest_server:
       e = doc.createElement('manifest-server')
@@ -482,7 +493,7 @@ class XmlManifest(object):
         output_projects(p, e, list(sorted(subprojects)))
 
     """
-    更新manifest.xml根节点下的'project'子节点
+    生成<manifest>根节点下的<project>子节点
     """
     projects = set(p.name for p in self._paths.values() if not p.parent)
     output_projects(None, root, list(sorted(projects)))
@@ -495,6 +506,9 @@ class XmlManifest(object):
                      ' '.join(self._repo_hooks_project.enabled_repo_hooks))
       root.appendChild(e)
 
+    """
+    将manifest内容使用'UTF-8'编码写入fd指定的文件中
+    """
     doc.writexml(fd, '', '  ', '\n', 'UTF-8')
 
   def _output_manifest_project_extras(self, p, e):
@@ -536,10 +550,16 @@ class XmlManifest(object):
     self._Load()
     return self._manifest_server
 
+  """
+  返回manifest库.git/config下的'repo.mirror'设置
+  """
   @property
   def IsMirror(self):
     return self.manifestProject.config.GetBoolean('repo.mirror')
 
+  """
+  返回manifest库.git/config下的'repo.archive'设置
+  """
   @property
   def IsArchive(self):
     return self.manifestProject.config.GetBoolean('repo.archive')
@@ -661,8 +681,10 @@ class XmlManifest(object):
       self._loaded = True
 
   """
-  加载include_root下的path指定的xml文件，并将manifest节点下的所有子节点添加到nodes[]列表中。
+  加载include_root下path指定的xml文件，并将manifest节点下的所有子节点添加到nodes[]列表中。
   如果xml文件的manifest节包含'incude'节点，则递归加载incude指定的xml文件。
+
+  实际上就是将manifest下的所有子节点添加到nodes[]列表中，对于'include'子节点，则递归加载'include'对应的文件。
 
   如：
   _ParseManifestXml(path='/path/to/test/.repo/manifest.xml', include_root='/path/to/test/.repo/manifests')
@@ -693,6 +715,9 @@ class XmlManifest(object):
     nodes = []
     for node in manifest.childNodes:  # pylint:disable=W0631
                                       # We only get here if manifest is initialised
+      """
+      如果是'include'子节点，则调动_ParseManifestXml()递归解析
+      """
       if node.nodeName == 'include':
         name = self._reqatt(node, 'name')
         fp = os.path.join(include_root, name)
@@ -712,15 +737,33 @@ class XmlManifest(object):
           raise ManifestParseError(
               "failed parsing included manifest %s: %s", (name, e))
       else:
+        """
+        对于除'include'外的其它节点，则直接将解析得到的节点添加到nodes列表中
+        """
         nodes.append(node)
     return nodes
 
+
+  """
+  对_ParseManifestXml()解析得到的节点列表nodes[]进一步分类处理，生成以下对象:
+  _remotes, _default, _notice, _manifest_server, _paths, _projects[], _repo_hooks_project。
+
+  调用顺序如下:
+  1. 调用_ParseManifestXml()解析xml文件的子节点并存放到nodes[]列表中
+
+    nodes = []
+    nodes.append(_ParseManifestXml(manifestFile, manifestProject.worktree))
+
+  2. 调用_ParseManifest(nodes)解析每一个节点nodes的属性
+
+    _ParseManifest(nodes)
+  """
   def _ParseManifest(self, node_list):
     """
     循环解析节点列表中的节点
 
     对于'remote'节点，解析并构造_Remote对象，然后添加到_remotes字典中。
-    如：
+    如:
     aosp: <remote  name="aosp"  fetch=".." />
     """
     for node in itertools.chain(*node_list):
@@ -737,7 +780,7 @@ class XmlManifest(object):
 
     """
     对于'default'节点，解析并构造_Default对象，用于设置_default成员
-    如：
+    如:
     aosp: <default revision="refs/tags/android-4.0.1_r1" remote="aosp" sync-j="4" />
     """
     for node in itertools.chain(*node_list):
@@ -780,6 +823,9 @@ class XmlManifest(object):
               (self.manifestFile))
         self._manifest_server = url
 
+    """
+    递归添加project及其所有子projects
+    """
     def recursively_add_projects(project):
       projects = self._projects.setdefault(project.name, [])
       if project.relpath is None:
@@ -796,12 +842,19 @@ class XmlManifest(object):
         recursively_add_projects(subproject)
 
     """
-    对于'project'节点，解析并构造_Project对象，用于设置_default成员
-    如：
-    op-tee: <project path="build" name="OP-TEE/build.git" revision="refs/tags/3.2.0" clone-depth="1">
-      aosp: <project path="abi/cpp" name="platform/abi/cpp" />
+    解析nodes[]列表中的其它节点，包括：
+    - 'project'
+    - 'extend-project'
+    - 'repo-hooks'
+    - 'remove-project'
     """
     for node in itertools.chain(*node_list):
+      """
+      对于'project'节点，调用_ParseProject(node)解析并构造_Project对象，然后递归添加project节点的所有子projects节点
+      如：
+      op-tee: <project path="build" name="OP-TEE/build.git" revision="refs/tags/3.2.0" clone-depth="1">
+        aosp: <project path="abi/cpp" name="platform/abi/cpp" />
+      """
       if node.nodeName == 'project':
         project = self._ParseProject(node)
         recursively_add_projects(project)
@@ -987,6 +1040,9 @@ class XmlManifest(object):
       d.sync_s = sync_s.lower() in ("yes", "true", "1")
     return d
 
+  """
+  解析manifest中的'notice'节点
+  """
   def _ParseNotice(self, node):
     """
     reads a <notice> element from the manifest file
@@ -1044,10 +1100,16 @@ class XmlManifest(object):
     """
     reads a <project> element from the manifest file
     """
+    """
+    project的name属性
+    """
     name = self._reqatt(node, 'name')
     if parent:
       name = self._JoinName(parent.name, name)
 
+    """
+    project的remote属性
+    """
     remote = self._get_remote(node)
     if remote is None:
       remote = self._default.remote
@@ -1055,6 +1117,9 @@ class XmlManifest(object):
       raise ManifestParseError("no remote for project %s within %s" %
             (name, self.manifestFile))
 
+    """
+    project的revision属性
+    """
     revisionExpr = node.getAttribute('revision') or remote.revision
     if not revisionExpr:
       revisionExpr = self._default.revisionExpr
@@ -1062,6 +1127,9 @@ class XmlManifest(object):
       raise ManifestParseError("no revision for project %s within %s" %
             (name, self.manifestFile))
 
+    """
+    project的path属性
+    """
     path = node.getAttribute('path')
     if not path:
       path = name
@@ -1069,24 +1137,36 @@ class XmlManifest(object):
       raise ManifestParseError("project %s path cannot be absolute in %s" %
             (name, self.manifestFile))
 
+    """
+    project的rebase属性
+    """
     rebase = node.getAttribute('rebase')
     if not rebase:
       rebase = True
     else:
       rebase = rebase.lower() in ("yes", "true", "1")
 
+    """
+    project的sync-c属性
+    """
     sync_c = node.getAttribute('sync-c')
     if not sync_c:
       sync_c = False
     else:
       sync_c = sync_c.lower() in ("yes", "true", "1")
 
+    """
+    project的sync-s属性
+    """
     sync_s = node.getAttribute('sync-s')
     if not sync_s:
       sync_s = self._default.sync_s
     else:
       sync_s = sync_s.lower() in ("yes", "true", "1")
 
+    """
+    project的clone-depth属性
+    """
     clone_depth = node.getAttribute('clone-depth')
     if clone_depth:
       try:
@@ -1097,11 +1177,19 @@ class XmlManifest(object):
         raise ManifestParseError('invalid clone-depth %s in %s' %
                                  (clone_depth, self.manifestFile))
 
+    """
+    project的dest-branch属性
+    """
     dest_branch = node.getAttribute('dest-branch') or self._default.destBranchExpr
 
+    """
+    project的upstream属性
+    """
     upstream = node.getAttribute('upstream')
 
     """
+    project的upstream属性
+
     节点含有'groups'属性的情况：
     如：<project groups="pdk" name="platform/bootable/recovery" path="bootable/recovery" />
     """
@@ -1110,6 +1198,9 @@ class XmlManifest(object):
       groups = node.getAttribute('groups')
     groups = self._ParseGroups(groups)
 
+    """
+    根据partent设置，得到git库的相关路径
+    """
     if parent is None:
       relpath, worktree, gitdir, objdir = self.GetProjectPaths(name, path)
     else:
@@ -1148,6 +1239,13 @@ class XmlManifest(object):
                       dest_branch = dest_branch,
                       **extra_proj_attrs)
 
+    """
+    检查project节点的子节点，包括:
+    - copyfile
+    - linkfile
+    - annotation
+    - project
+    """
     for n in node.childNodes:
       if n.nodeName == 'copyfile':
         self._ParseCopyFile(project, n)
