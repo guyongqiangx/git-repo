@@ -1339,10 +1339,10 @@ def _RunSelf(wrapper_path):
   """
   有wrapper_path有两种可能的情况，单独的repo脚本或完整的repo库。
 
-  1. 单独的repo脚本，如: wrapper_path = /home/rg935739/bin/repo, 则:
-  my_dir  = /home/rg935739/bin
-  my_main = /home/rg935739/bin/main.py
-  my_git  = /home/rg935739/bin/.git
+  1. 单独的repo脚本，如: wrapper_path = /home/guyongqiang/bin/repo, 则:
+  my_dir  = /home/guyongqiang/bin
+  my_main = /home/guyongqiang/bin/main.py
+  my_git  = /home/guyongqiang/bin/.git
 
   2. 完整的repo库，如: wrapper_path = /path/to/test/.repo/repo/repo, 则:
   my_dir  = /path/to/test/.repo/repo
@@ -1435,7 +1435,7 @@ def main(orig_args):
 
   """
   名称为'repo'的脚本至少在两个地方存在：
-  1. 用户下载的repo脚本，通常位于主目录bin文件夹下，如: /home/rg935739/bin/repo
+  1. 用户下载的repo脚本，通常位于主目录bin文件夹下，如: /home/guyongqiang/bin/repo
   2. 'repo init'初始化以后下载的repo库中的repo脚本: '.repo/repo/repo'
 
   使用os.path.abspath(__file__)来获取当前执行脚本的绝对路径。
@@ -1529,7 +1529,7 @@ def main(orig_args):
         '/path/to/test/.repo/repo/main.py',
         '--repo-dir=/path/to/test/.repo',
         '--wrapper-version=1.23',
-        '--wrapper-path=/home/rg935739/bin/repo',
+        '--wrapper-path=/home/guyongqiang/bin/repo',
         '--',
         'init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1',
         '--repo-url=https://gerrit.googlesource.com/git-repo',
@@ -1541,7 +1541,7 @@ def main(orig_args):
         '/path/to/test/.repo/repo/main.py',
         '--repo-dir=/path/to/test/.repo',
         '--wrapper-version=1.23',
-        '--wrapper-path=/home/rg935739/bin/repo',
+        '--wrapper-path=/home/guyongqiang/bin/repo',
         '--',
         'sync']
 

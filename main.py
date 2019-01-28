@@ -300,7 +300,7 @@ def _MyRepoPath():
 比较单独执行的repo工具脚本与repo库中'.repo/repo/repo'脚本的版本，
 如果二者版本不一致，提示相应的升级信息。
 
-_CheckWrapperVersion(ver='1.23', repo_path='/home/rg935739/bin/repo')
+_CheckWrapperVersion(ver='1.23', repo_path='/home/guyongqiang/bin/repo')
 """
 def _CheckWrapperVersion(ver, repo_path):
   if not repo_path:
@@ -583,7 +583,7 @@ main.py脚本入口'__main__'调用这里的'_Main(argv)'
   _Main(argv)接收参数：
   argv = ['--repo-dir=/path/to/test/.repo',
           '--wrapper-version=1.23',
-          '--wrapper-path=/home/rg935739/bin/repo',
+          '--wrapper-path=/home/guyongqiang/bin/repo',
           '--',
           'init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1']
 
@@ -591,7 +591,7 @@ main.py脚本入口'__main__'调用这里的'_Main(argv)'
   _Main(argv)接收参数：
   argv = ['--repo-dir=/path/to/test/.repo',
           '--wrapper-version=1.23',
-          '--wrapper-path=/home/rg935739/bin/repo',
+          '--wrapper-path=/home/guyongqiang/bin/repo',
           '--',
           'sync']
 """
@@ -604,9 +604,9 @@ def _Main(argv):
   解析以上3个参数，存放到opt中，在argv中移除这个3个参数后将剩余参数传递给subcmds下的命令去执行。
 
   以'repo init -u https://android.googlesource.com/platform/manifest -b android-4.0.1_r1'为例:
-  opt = { .repodir = '/path/to/test/.repo',
+  opt = {         .repodir = '/path/to/test/.repo',
           .wrapper-version = '1.23',
-          .wrapper-path = '/path/to/test/.repo/repo/repo' }
+             .wrapper-path = '/path/to/test/.repo/repo/repo' }
   argv = ['init',
           '-u',
           'https://android.googlesource.com/platform/manifest',
@@ -624,7 +624,7 @@ def _Main(argv):
   opt, argv = opt.parse_args(argv)
 
   """
-  检查单独的repo脚本和repo库中的repo脚本版本是否一致
+  检查单独的repo脚本和repo库中的repo脚本(wrapper)版本是否一致
   如果不一致，显示更新单独执行的repo脚本的提示信息
 
   '--repo-dir'需要被设置为'.repo'目录的路径，检查是否已经设置。
@@ -679,20 +679,38 @@ def _Main(argv):
 main.py脚本入口
 
   命令:'repo init -u https://android.googlesource.com/platform/manifest -b android-4.0.1_r1'
+  在repo脚本中执行的命令如下：
+    ['/usr/bin/python',
+        '/path/to/test/.repo/repo/main.py',
+        '--repo-dir=/path/to/test/.repo',
+        '--wrapper-version=1.23',
+        '--wrapper-path=/home/guyongqiang/bin/repo',
+        '--',
+        'init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1',
+        '--repo-url=https://gerrit.googlesource.com/git-repo',
+        '--repo-branch=stable']
   main.py接收到的参数sys.argv[]如下：
     ['/path/to/test/.repo/repo/main.py',
         '--repo-dir=/path/to/test/.repo',
         '--wrapper-version=1.23',
-        '--wrapper-path=/home/rg935739/bin/repo',
+        '--wrapper-path=/home/guyongqiang/bin/repo',
         '--',
         'init', '-u', 'https://android.googlesource.com/platform/manifest', '-b', 'android-4.0.1_r1']
 
   命令:'repo sync'
+  在repo脚本中执行的命令如下：
+    ['/usr/bin/python',
+        '/path/to/test/.repo/repo/main.py',
+        '--repo-dir=/path/to/test/.repo',
+        '--wrapper-version=1.23',
+        '--wrapper-path=/home/guyongqiang/bin/repo',
+        '--',
+        'sync']
   main.py接收到的参数sys.argv[]如下：
     ['/path/to/test/.repo/repo/main.py',
         '--repo-dir=/path/to/test/.repo',
         '--wrapper-version=1.23',
-        '--wrapper-path=/home/rg935739/bin/repo',
+        '--wrapper-path=/home/guyongqiang/bin/repo',
         '--',
         'sync']
 """
