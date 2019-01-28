@@ -130,6 +130,10 @@ class _XmlRemote(object):
       url = urllib.parse.urljoin(manifestUrl, url)
     return url
 
+  """
+  将projectName对应的resolvedFetchUrl转换为RemoteSpec类对象
+  如:
+  """
   def ToRemoteSpec(self, projectName):
     url = self.resolvedFetchUrl.rstrip('/') + '/' + projectName
     remoteName = self.name
@@ -203,18 +207,18 @@ class XmlManifest(object):
     以repodir='/path/to/test/.repo'为例：
 
     默认初始化以下成员：
-    .repodir = '/path/to/test/.repo'
-    .topdir = '/path/to/test'
-    .manifestFile = '/path/to/test/.repo/manifest.xml'
-    .globalConfig = GitConfig(configfile='~/.gitconfig')
+                 .repodir = '/path/to/test/.repo'
+                  .topdir = '/path/to/test'
+            .manifestFile = '/path/to/test/.repo/manifest.xml'
+            .globalConfig = GitConfig(configfile='~/.gitconfig')
     .localManifestWarning = False
-    .isGitcClient = False
-    .repoProject = MetaProject(    name='repo',
-                                 gitdir='/path/to/test/.repo/repo/.git',
-                               worktree='/path/to/test/.repo/repo')
-    .manifestProject = MetaProject(name='manifests',
-                                 gitdir='/path/to/test/.repo/manifests.git',
-                               worktree='/path/to/test/.repo/manifests')
+            .isGitcClient = False
+             .repoProject = MetaProject(    name='repo',
+                                          gitdir='/path/to/test/.repo/repo/.git',
+                                        worktree='/path/to/test/.repo/repo')
+         .manifestProject = MetaProject(    name='manifests',
+                                          gitdir='/path/to/test/.repo/manifests.git',
+                                        worktree='/path/to/test/.repo/manifests')
     """
     self.repodir = os.path.abspath(repodir)
     self.topdir = os.path.dirname(self.repodir)
@@ -223,6 +227,9 @@ class XmlManifest(object):
     self.localManifestWarning = False
     self.isGitcClient = False
 
+    """
+    'repo'和'manifests'分别对应repoProject和manifestProject两个MetaProject
+    """
     self.repoProject = MetaProject(self, 'repo',
       gitdir   = os.path.join(repodir, 'repo/.git'),
       worktree = os.path.join(repodir, 'repo'))
@@ -232,16 +239,7 @@ class XmlManifest(object):
       worktree = os.path.join(repodir, 'manifests'))
 
     """
-    _Unload()操作更新以下成员：
-    ._loaded = False
-    ._projects = {}
-    ._paths = {}
-    ._remotes = {}
-    ._default = None
-    ._repo_hooks_project = None
-    ._notice = None
-    .branch = None
-    ._manifest_server = None
+    初始化时执行_Unload()操作清空除以上成员外的其他成员设置
     """
     self._Unload()
 
@@ -288,7 +286,7 @@ class XmlManifest(object):
 
       类似以下操作：
       $ rm -rf '/path/to/test/.repo/manifest.xml'
-      $ ln -s 'manifests/default.xml' '/path/to/test/.repo/manifest.xml'
+      $ ln -s '/path/to/test/.repo/manifests/default.xml' '/path/to/test/.repo/manifest.xml'
       """
       if os.path.lexists(self.manifestFile):
         os.remove(self.manifestFile)
@@ -296,7 +294,16 @@ class XmlManifest(object):
     except OSError as e:
       raise ManifestParseError('cannot link manifest %s: %s' % (name, str(e)))
 
+  """
+  将_XmlRemote类对象转换为Xml中的remote节点
+  """
   def _RemoteToXml(self, r, doc, root):
+    """
+    1. 在manifest的根目录下添加名为'remote'的子节点
+
+    2. 为'remote'子节点设置'name', 'fetch', 'pushurl', 'alias', 'review'和'revision'等属性
+       如: <remote fetch="https://github.com" name="github"/>
+    """
     e = doc.createElement('remote')
     root.appendChild(e)
     e.setAttribute('name', r.name)
@@ -310,6 +317,9 @@ class XmlManifest(object):
     if r.revision is not None:
       e.setAttribute('revision', r.revision)
 
+  """
+  使用分割groups字符串，并返回结果列表
+  """
   def _ParseGroups(self, groups):
     return [x for x in re.split(r'[,\s]+', groups) if x]
 
@@ -346,6 +356,10 @@ class XmlManifest(object):
     if self.remotes:
       root.appendChild(doc.createTextNode(''))
 
+    """
+    更新manifest.xml根节点下的'default'子节点
+    如: <default remote="github" revision="master"/>
+    """
     have_default = False
     e = doc.createElement('default')
     if d.remote:
@@ -370,6 +384,9 @@ class XmlManifest(object):
       root.appendChild(e)
       root.appendChild(doc.createTextNode(''))
 
+    """
+    更新manifest.xml根节点下的'manifest-server'子节点
+    """
     if self._manifest_server:
       e = doc.createElement('manifest-server')
       e.setAttribute('url', self._manifest_server)
@@ -464,6 +481,9 @@ class XmlManifest(object):
         subprojects = set(subp.name for subp in p.subprojects)
         output_projects(p, e, list(sorted(subprojects)))
 
+    """
+    更新manifest.xml根节点下的'project'子节点
+    """
     projects = set(p.name for p in self._paths.values() if not p.parent)
     output_projects(None, root, list(sorted(projects)))
 
