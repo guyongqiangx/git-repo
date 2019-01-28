@@ -86,6 +86,9 @@ def _Color(fg=None, bg=None, attr=None):
 DEFAULT = None
 
 
+"""
+设置颜色方案，如果命令行不带'--color=COLOR'参数，默认为None，直接返回。
+"""
 def SetDefaultColoring(state):
   """Set coloring behavior to |state|.
 
