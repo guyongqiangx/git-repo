@@ -302,6 +302,7 @@ class XmlManifest(object):
     1. 在manifest的根目录下添加名为'remote'的子节点
 
     2. 为'remote'子节点设置'name', 'fetch', 'pushurl', 'alias', 'review'和'revision'等属性
+       即: <remote name="...", fetch="..." pushurl="..." alias="..." review="..." revision="..." />
        如: <remote fetch="https://github.com" name="github"/>
     """
     e = doc.createElement('remote')
@@ -318,7 +319,7 @@ class XmlManifest(object):
       e.setAttribute('revision', r.revision)
 
   """
-  使用分割groups字符串，并返回结果列表
+  使用逗号(',')和空白字符('\s')分割groups字符串，并返回结果列表
   """
   def _ParseGroups(self, groups):
     return [x for x in re.split(r'[,\s]+', groups) if x]
@@ -369,6 +370,7 @@ class XmlManifest(object):
     生成<manifest>根节点下的<default>子节点
 
     更新manifest.xml根节点下的'default'子节点
+    即: <default remote="..." revision="..." dest-branch="..." sync-j="1" sync-c="true" sync-s="true" />
     如: <default remote="github" revision="master"/>
     """
     have_default = False
@@ -397,6 +399,7 @@ class XmlManifest(object):
 
     """
     生成<manifest>根节点下的<manifest-server>子节点
+    即: <manifest-server url="..." />
     """
     if self._manifest_server:
       e = doc.createElement('manifest-server')
@@ -404,6 +407,9 @@ class XmlManifest(object):
       root.appendChild(e)
       root.appendChild(doc.createTextNode(''))
 
+    """
+    遍历输出projects[]列表中的所有project，而且对于每一个project，还会输出其所有子project
+    """
     def output_projects(parent, parent_node, projects):
       for project_name in projects:
         for project in self._projects[project_name]:
@@ -419,6 +425,14 @@ class XmlManifest(object):
         name = self._UnjoinName(parent.name, name)
         relpath = self._UnjoinRelpath(parent.relpath, relpath)
 
+      """
+      生成<project>节点
+      即: <project name="..." path="..." remote="..." revision="..." upstream="..." dest-branch="..." groups="..." sync-c="..." sync-s="..." clone-depth="...">
+            <copyfile src="..." dest="..." />
+            <linkefile src="..." dest="..." />
+            <annotation name="..." value="..." />
+          </project>
+      """
       e = doc.createElement('project')
       parent_node.appendChild(e)
       e.setAttribute('name', name)
@@ -488,16 +502,28 @@ class XmlManifest(object):
 
       self._output_manifest_project_extras(p, e)
 
+      """
+      如果有子projects，递归输出其子projects
+      """
       if p.subprojects:
+        """
+        先生成所有子projects的名字集合(set), 然后遍历输出集合中的所有projects
+        """
         subprojects = set(subp.name for subp in p.subprojects)
         output_projects(p, e, list(sorted(subprojects)))
 
     """
     生成<manifest>根节点下的<project>子节点
+
+    先生成projects的名字集合(set), 然后遍历输出集合中所有projects及其子projects
     """
     projects = set(p.name for p in self._paths.values() if not p.parent)
     output_projects(None, root, list(sorted(projects)))
 
+    """
+    生成<manifest>根节点下的<repo-hooks>子节点
+    即: <repo-hooks in-project="..." enabled-list="..." />
+    """
     if self._repo_hooks_project:
       root.appendChild(doc.createTextNode(''))
       e = doc.createElement('repo-hooks')
@@ -515,36 +541,57 @@ class XmlManifest(object):
     """Manifests can modify e if they support extra project attributes."""
     pass
 
+  """
+  返回manifest的path列表
+  """
   @property
   def paths(self):
     self._Load()
     return self._paths
 
+  """
+  返回manifests的project列表
+  """
   @property
   def projects(self):
     self._Load()
     return list(self._paths.values())
 
+  """
+  返回manifest的remote列表
+  """
   @property
   def remotes(self):
     self._Load()
     return self._remotes
 
+  """
+  返回manifest的default节点对象
+  """
   @property
   def default(self):
     self._Load()
     return self._default
 
+  """
+  返回manifest的repo-hooks节点对象
+  """
   @property
   def repo_hooks_project(self):
     self._Load()
     return self._repo_hooks_project
 
+  """
+  返回manifest的notice节点对象
+  """
   @property
   def notice(self):
     self._Load()
     return self._notice
 
+  """
+  返回manifest的manifest-server节点对象
+  """
   @property
   def manifest_server(self):
     self._Load()
@@ -579,9 +626,17 @@ class XmlManifest(object):
     self._manifest_server = None
 
   """
-  在克隆的清单库中，当前分支名称始终为'default', _Load操作找到当前分支对应的原始分支用于设置branch成员。
+  在本地的清单库中，当前分支名默认为'default', _Load操作找到当前分支对应的原始分支用于设置branch成员。
 
-  所以branch成员保存了真正的分支名称。
+  .repo/manifests$ cat .git/config
+  ...
+  [remote "origin"]
+    url = https://android.googlesource.com/platform/manifest
+    fetch = +refs/heads/*:refs/remotes/origin/*
+  [branch "default"]
+    remote = origin
+    merge = refs/heads/android-4.0.1_r1
+  处理后 self.branch = 'android-4.0.1_r1'
 
   同时，加载
   - 远程 manifest.xml以及
@@ -601,22 +656,32 @@ class XmlManifest(object):
       [branch "default"]
               remote = origin
               merge = refs/heads/android-4.0.1_r1
+
       从以上操作可见，当前位于'default'分支，对于'default'分支，其：
       remote = origin
-      merge = refs/heads/android-4.0.1_r1
+       merge = refs/heads/android-4.0.1_r1
 
       因此这里:
-      m.CurrentBranch='default'
-      m.GetBranch(m.CurrentBranch).merge='refs/heads/android-4.0.1_r1'
+      m.CurrentBranch = 'default'
+      m.GetBranch(m.CurrentBranch).merge = 'refs/heads/android-4.0.1_r1'
 
-      经过处理后，b='android-4.0.1_r1'
-      所以最终 self.branch='android-4.0.1_r1'
+      经过处理后，b = 'android-4.0.1_r1'
+      所以最终 self.branch = 'android-4.0.1_r1'
       """
       m = self.manifestProject
       b = m.GetBranch(m.CurrentBranch).merge
       if b is not None and b.startswith(R_HEADS):
         b = b[len(R_HEADS):]
       self.branch = b
+
+      """
+      #
+      # 解析manifest文件的节点，并保存到nodes[]列表中，解析的文件包括3种:
+      # 1. '.repo/manifest.xml'
+      # 2. '.repo/local_manifest.xml'    (旧方式, 即原来的local manifest方式，建议使用新方式)
+      # 3. '.repo/local_manifests/*.xml' (新方式, 建议采用的新的local manifest方式)
+      #
+      """
 
       """
       加载manifestFile ='/path/to/test/.repo/manifest.xml'中的nodes节点。
@@ -658,10 +723,10 @@ class XmlManifest(object):
         pass
 
       """
-      解析从:
-      - '/path/to/test/.repo/manifest.xml'文件和
-      - '/path/to/test/.repo/local_manifests'目录下的所有xml文件
-      的nodes节点中提取的信息。
+      解析上一步从manifest文件中提取的nodes[]节点
+
+      _ParseManifest(nodes)操作会对nodes中的各类节点进行解析并存放到对应的类对象中，包括：
+      _remotes, _default, _notice, _manifest_server, _paths, _projects[], _repo_hooks_project。
       """
       try:
         self._ParseManifest(nodes)
@@ -958,8 +1023,7 @@ class XmlManifest(object):
       self._paths[project.relpath] = project
 
   """
-  解析manifest中的'remote'节点。
-  使用节点的'name', 'alias', 'fetch', 'pushurl', 'review'和'revision'属性构建_Remote对象。
+  解析manifest中'remote'节点的属性，并用于构建_XmlRemote()对象。
 
   如：
   op-tee: <remote name="github" fetch="https://github.com" />
@@ -988,9 +1052,9 @@ class XmlManifest(object):
     if revision == '':
       revision = None
     """
-    获取.git/config中remote.origin.url的属性，并赋值给manifestUrl。
+    获取.repo/manifests/.git/config中remote.origin.url的属性，并赋值给manifestUrl。
     如：
-    $ cat .git/config
+    .repo/manifests$ cat .git/config
     ...
     [remote "origin"]
             url = https://android.googlesource.com/platform/manifest
@@ -1001,8 +1065,7 @@ class XmlManifest(object):
     return _XmlRemote(name, alias, fetch, pushUrl, manifestUrl, review, revision)
 
   """
-  解析manifest中的'default'节点。
-  使用节点的'revision', 'dest-branch', 'sync-j', 'sync-c', 'sync-s'属性构建_Default对象。
+  解析manifest中'default'节点的属性，并用于构建_Default对象。
 
   如：
   op-tee: <default remote="github" revision="master" />
@@ -1082,9 +1145,17 @@ class XmlManifest(object):
 
     return '\n'.join(cleanLines)
 
+  """
+  将parent_name和name连接在一起，返回'parent_name/name'
+  如: _JoinName("build", "google") --> 'build/google'
+  """
   def _JoinName(self, parent_name, name):
     return os.path.join(parent_name, name)
 
+  """
+  拆分name相对于parent_name的路径
+  如: _UnjoinName('build', 'build/google') --> google
+  """
   def _UnjoinName(self, parent_name, name):
     return os.path.relpath(name, parent_name)
 
@@ -1258,6 +1329,21 @@ class XmlManifest(object):
 
     return project
 
+  """
+  返回名为name的project对应的git相关路径(包括worktree, gitdir, objdir)
+
+  假设: topdir='/path/to/test', path='build' name='google'
+
+  1. mirror仓库，返回路径:
+     worktree = None
+       gitdir = '/path/to/test/google.git'
+       objdir = '/path/to/test/google.git'
+
+  2. 普通仓库，返回路径:
+     worktree = '/path/to/test/build'
+       gitdir = '/path/to/test/.repo/projects/build.git'
+       objdir = '/path/to/test/.repo/project-objects/google.git'
+  """
   def GetProjectPaths(self, name, path):
     relpath = path
     if self.IsMirror:
@@ -1276,9 +1362,17 @@ class XmlManifest(object):
   def GetSubprojectName(self, parent, submodule_path):
     return os.path.join(parent.name, submodule_path)
 
+  """
+  将parent_relpath和relpath连接在一起，返回'parent_relpath/relpath'
+  如: _JoinRelpath("build", "google") --> 'build/google'
+  """
   def _JoinRelpath(self, parent_relpath, relpath):
     return os.path.join(parent_relpath, relpath)
 
+  """
+  拆分relpath相对于parent_relpath的路径
+  如: _UnjoinRelpath('build', 'build/google') --> google
+  """
   def _UnjoinRelpath(self, parent_relpath, relpath):
     return os.path.relpath(relpath, parent_relpath)
 
@@ -1292,6 +1386,10 @@ class XmlManifest(object):
       worktree = os.path.join(parent.worktree, path).replace('\\', '/')
     return relpath, worktree, gitdir, objdir
 
+  """
+  解析copyfile节点，并添加到对应的project中
+  即: <copyfile src="..." dest="..." />
+  """
   def _ParseCopyFile(self, project, node):
     src = self._reqatt(node, 'src')
     dest = self._reqatt(node, 'dest')
@@ -1300,6 +1398,10 @@ class XmlManifest(object):
       # dest is relative to the top of the tree
       project.AddCopyFile(src, dest, os.path.join(self.topdir, dest))
 
+  """
+  解析linkfile节点，并添加到对应的project中
+  即: <linkfile src="..." dest="..." />
+  """
   def _ParseLinkFile(self, project, node):
     src = self._reqatt(node, 'src')
     dest = self._reqatt(node, 'dest')
@@ -1308,6 +1410,10 @@ class XmlManifest(object):
       # dest is relative to the top of the tree
       project.AddLinkFile(src, dest, os.path.join(self.topdir, dest))
 
+  """
+  解析annotation节点，并添加到对应的project中
+  即: <annotation name="..." value="..." keep="..." />
+  """
   def _ParseAnnotation(self, project, node):
     name = self._reqatt(node, 'name')
     value = self._reqatt(node, 'value')
@@ -1320,17 +1426,29 @@ class XmlManifest(object):
             '"true" or "false"')
     project.AddAnnotation(name, value, keep)
 
+  """
+  提取node节点的'remote'属性，并返回manifest中此remote相应的对象。
+  """
   def _get_remote(self, node):
+    """
+    提取node节点的'remote'属性，保存的实际上是一个remote对象的name
+    """
     name = node.getAttribute('remote')
     if not name:
       return None
 
+    """
+    从manifest的_remotes[]列表中返回名为name的_XmlRemote()对象。
+    """
     v = self._remotes.get(name)
     if not v:
       raise ManifestParseError("remote %s not defined in %s" %
             (name, self.manifestFile))
     return v
 
+  """
+  提取node节点名为attname的属性
+  """
   def _reqatt(self, node, attname):
     """
     reads a required attribute from the node.
@@ -1341,6 +1459,9 @@ class XmlManifest(object):
             (attname, node.nodeName, self.manifestFile))
     return v
 
+  """
+  比较本地manifest和指定manifest的project差异, 包括added/removed/changed
+  """
   def projectsDiff(self, manifest):
     """return the projects differences between two manifests.
 
@@ -1355,12 +1476,21 @@ class XmlManifest(object):
 
     diff = {'added': [], 'removed': [], 'changed': [], 'unreachable': []}
 
+    """
+    遍历本地manifest中的paths，逐个比较在两个manifest中的状态
+    """
     for proj in fromKeys:
+      """
+      不在对比manifest的paths中，说明已经移除了(removed)
+      """
       if not proj in toKeys:
         diff['removed'].append(fromProjects[proj])
       else:
         fromProj = fromProjects[proj]
         toProj = toProjects[proj]
+        """
+        比较两个paths的revision，如果二者不等，说明已经改变了(changed)
+        """
         try:
           fromRevId = fromProj.GetCommitRevisionId()
           toRevId = toProj.GetCommitRevisionId()
@@ -1369,8 +1499,14 @@ class XmlManifest(object):
         else:
           if fromRevId != toRevId:
             diff['changed'].append((fromProj, toProj))
+        """
+        每检查完一个，就从对比的manifest中删除相应的项
+        """
         toKeys.remove(proj)
 
+    """
+    删除完本地manifest中对应的项，对比manifest中剩余的项就是新增的了
+    """
     for proj in toKeys:
       diff['added'].append(toProjects[proj])
 
