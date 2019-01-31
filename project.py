@@ -247,7 +247,24 @@ class _Annotation(object):
     self.value = value
     self.keep = keep
 
+"""
+_CopyFile类
 
+每一个_CopyFile类对象对应于manifest中的一个<copyfile src="..." dest="..." />节点。
+
+例如，对于对于android aosp项目默认的清单文件default.xml，有:
+.repo/manifests$ cat default.xml
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  ...
+  <project path="build/make" name="platform/build" groups="pdk" >
+    <copyfile src="core/root.mk" dest="Makefile" />
+    <linkfile src="CleanSpec.mk" dest="build/CleanSpec.mk" />
+    ...
+  </project>
+
+这里name为"platform/build"的project中，包含一个copyfile的子节点。
+"""
 class _CopyFile(object):
 
   def __init__(self, src, dest, abssrc, absdest):
@@ -277,7 +294,28 @@ class _CopyFile(object):
       except IOError:
         _error('Cannot copy file %s to %s', src, dest)
 
+"""
+_LinkFile类
 
+每一个_LinkFile类对象对应于manifest中的一个<linkfile src="..." dest="..." />节点。
+
+例如，对于对于android aosp项目默认的清单文件default.xml，有:
+.repo/manifests$ cat default.xml
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  ...
+  <project path="build/make" name="platform/build" groups="pdk" >
+    <copyfile src="core/root.mk" dest="Makefile" />
+    <linkfile src="CleanSpec.mk" dest="build/CleanSpec.mk" />
+    <linkfile src="buildspec.mk.default" dest="build/buildspec.mk.default" />
+    <linkfile src="core" dest="build/core" />
+    <linkfile src="envsetup.sh" dest="build/envsetup.sh" />
+    <linkfile src="target" dest="build/target" />
+    <linkfile src="tools" dest="build/tools" />
+  </project>
+
+这里name为"platform/build"的project中，包含多个linkfile的子节点。
+"""
 class _LinkFile(object):
 
   def __init__(self, git_worktree, src, dest, relsrc, absdest):
@@ -353,6 +391,16 @@ class RemoteSpec(object):
     self.orig_name = orig_name
 
 
+"""
+RepoHook类
+
+在subcmds/upload.py中，是这样调用RepoHook的：
+
+hook = RepoHook('pre-upload', manifest.repo_hooks_project,
+                      manifest.topdir,
+                      manifest.manifestProject.GetRemote('origin').url,
+                      abort_if_user_denies=True)
+"""
 class RepoHook(object):
 
   """A RepoHook contains information about a script to run as a hook.
