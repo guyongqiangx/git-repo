@@ -59,6 +59,9 @@ else:
   # pylint:enable=W0622
 
 
+"""
+往path指定的文件中写入内容content
+"""
 def _lwrite(path, content):
   lock = '%s.lock' % path
 
@@ -74,12 +77,16 @@ def _lwrite(path, content):
     os.remove(lock)
     raise
 
-
+"""
+往stderr中写入'error: xxx'格式的提示信息
+"""
 def _error(fmt, *args):
   msg = fmt % args
   print('error: %s' % msg, file=sys.stderr)
 
-
+"""
+往stderr中写入'warn: xxx'格式的提示信息
+"""
 def _warn(fmt, *args):
   msg = fmt % args
   print('warn: %s' % msg, file=sys.stderr)
@@ -1441,7 +1448,7 @@ class Project(object):
     return False
 
   """
-  执行网络IO部分的同步工作，不影响本地工作目录和分支状态
+  Sync_NetworkHalf()操作执行网络IO部分的同步工作，不影响本地工作目录和分支状态
   """
   def Sync_NetworkHalf(self,
                        quiet=False,
@@ -1623,6 +1630,9 @@ class Project(object):
       raise ManifestInvalidRevisionError('revision %s in %s not found' %
                                          (self.revisionExpr, self.name))
 
+  """
+  Sync_LocalHalf()调用执行本地IO操作，不需要访问网络
+  """
   def Sync_LocalHalf(self, syncbuf, force_sync=False):
     """Perform only the local IO portion of the sync process.
        Network access is not required.
@@ -1783,12 +1793,18 @@ class Project(object):
     else:
       syncbuf.later1(self, _doff)
 
+  """
+  用copyfile节点的内容构造_CopyFile对象，交由copyfiles成员管理
+  """
   def AddCopyFile(self, src, dest, absdest):
     # dest should already be an absolute path, but src is project relative
     # make src an absolute path
     abssrc = os.path.join(self.worktree, src)
     self.copyfiles.append(_CopyFile(src, dest, abssrc, absdest))
 
+  """
+  用linkfile节点的内容构造_LinkFile对象，交由linkfiles成员管理
+  """
   def AddLinkFile(self, src, dest, absdest):
     # dest should already be an absolute path, but src is project relative
     # make src relative path to dest
@@ -1796,6 +1812,9 @@ class Project(object):
     relsrc = os.path.relpath(os.path.join(self.worktree, src), absdestdir)
     self.linkfiles.append(_LinkFile(self.worktree, src, dest, relsrc, absdest))
 
+  """
+  用annotation节点的内容构造_Annotation对象，交由annotations成员管理
+  """
   def AddAnnotation(self, name, value, keep):
     self.annotations.append(_Annotation(name, value, keep))
 
@@ -1819,7 +1838,7 @@ class Project(object):
 # Branch Management ##
 
   """
-  调用StartBranch(name)切换到名为$name的分支上
+  创建并切换到为名为$name的分支上
 
   以StartBranch('default')为例，有3种情况:
   1. 分支存在，且当前刚好在default分支上
@@ -1908,6 +1927,13 @@ class Project(object):
       return True
     return False
 
+  """
+  切换到为名为name的分支上
+
+  以CheckoutBranch('default')为例，有2种情况:
+  1. 刚好位于名为'default'的分支上
+  2. 不再'default'分支上，调用'git checkout'命令切换分支
+  """
   def CheckoutBranch(self, name):
     """Checkout a local topic branch.
 
@@ -1919,8 +1945,8 @@ class Project(object):
           didn't exist.
     """
     """
-    构造rev，如：'refs/heads/name'
-    提取head，如: 'refs/heads/name'或'676ed5ff9129f153bc3efb9b4bc98b1097f4db1f' (头指针分离)
+    构造name对应的分支引用到rev中:，如：'refs/heads/$name'
+    读取HEAD文件内容到head中，如: 'refs/heads/$name'或'676ed5ff9129f153bc3efb9b4bc98b1097f4db1f' (头指针分离)
     """
     rev = R_HEADS + name
     head = self.work_git.GetHead()
@@ -1929,6 +1955,9 @@ class Project(object):
       #
       return True
 
+    """
+    分别提取rev(名为name的分支引用)和head(HEAD引用)对应的commit id
+    """
     all_refs = self.bare_ref.all
     try:
       revid = all_refs[rev]
@@ -1943,6 +1972,9 @@ class Project(object):
       except KeyError:
         head = None
 
+    """
+    如果rev和head引用对应的commit id一样，说明当前刚好位于name指定的分支上，更新HEAD引用。
+    """
     if head == revid:
       # Same revision; just update HEAD to point to the new
       # target branch, but otherwise take no other action.
@@ -1952,6 +1984,7 @@ class Project(object):
       return True
 
     """
+    rev和head引用对应的commit id不一样的情况下，调用'git checkout'命令切换分支
     命令: 'git checkout name --'
     """
     return GitCommand(self,
@@ -1959,6 +1992,13 @@ class Project(object):
                       capture_stdout=True,
                       capture_stderr=True).Wait() == 0
 
+  """
+  丢弃为名为name的分支
+
+  以AbandonBranch('default')为例，有2种情况:
+  1. 刚好位于'default'分支上，将HEAD引用指向'default'分支引用对应的commit id，此时处于头指针分离状态
+  2. 不在'default'分支上，直接删除name分支
+  """
   def AbandonBranch(self, name):
     """Destroy a local topic branch.
 
@@ -1969,11 +2009,10 @@ class Project(object):
       True if the abandon succeeded; False if it didn't; None if the branch
       didn't exist.
     """
-    """
-    构造rev，如：'refs/heads/name'，通过判断ref是否在bare_ref.all中来确保ref已经存在。
-    注：bare_ref.all包含了'.git/'目录下所有的引用。
 
-    提取head，如: 'refs/heads/name'或'676ed5ff9129f153bc3efb9b4bc98b1097f4db1f' (头指针分离)
+    """
+    构造name对应的分支引用到rev中:，如：'refs/heads/$name'，通过判断ref是否在bare_ref.all中来确保ref已经存在。
+    注：bare_ref.all包含了'.git/'目录下所有的引用。
     """
     rev = R_HEADS + name
     all_refs = self.bare_ref.all
@@ -1981,6 +2020,11 @@ class Project(object):
       # Doesn't exist
       return None
 
+    """
+    读取HEAD文件内容到head中，如: 'refs/heads/$name'或'676ed5ff9129f153bc3efb9b4bc98b1097f4db1f' (头指针分离)
+
+    如果head和rev的引用字符串一样，说明当前位于要删除的name分支上。
+    """
     head = self.work_git.GetHead()
     if head == rev:
       # We can't destroy the branch while we are sitting
@@ -1988,14 +2032,22 @@ class Project(object):
       #
       head = all_refs[head]
 
+      """
+      head和rev的引用字符串一样此时也有两种情况:
+      1. 指向同一个提交 (例如，都指向rev分支的最新状态)
+      2. 没有指向同一个提交 (例如，HEAD指向rev分支次新的提交)
+      使用revid(具体的commit id)更新'.git/HEAD'文件，操作后，处于头指针分离状态。
+      """
       revid = self.GetRevisionId(all_refs)
       if head == revid:
         _lwrite(os.path.join(self.worktree, '.git', HEAD),
                 '%s\n' % revid)
       else:
         self._Checkout(revid, quiet=True)
+
     """
-    命令: 'git branch -D name'
+    如果当前不在要删除的name分支上，则直接对name分支执行删除操作
+    命令: 'git branch -D $name'
     """
     return GitCommand(self,
                       ['branch', '-D', name],
@@ -2700,10 +2752,27 @@ class Project(object):
 
   """
   签出rev对应的代码
+
+  如果rev是具体的commit id，操作后处于头指针分离状态
   """
   def _Checkout(self, rev, quiet=False):
     """
-    命令: 'git checkout -q rev --'
+    命令: 'git checkout -q $rev --'
+
+    如果rev是具体的commit id，操作后处于头指针分离状态例如:
+    git-repo$ git checkout 16889ba43da --
+    Note: checking out '16889ba43da'.
+
+    You are in 'detached HEAD' state. You can look around, make experimental
+    changes and commit them, and you can discard any commits you make in this
+    state without impacting any branches by performing another checkout.
+
+    If you want to create a new branch to retain commits you create, you may
+    do so (now or later) by using -b with the checkout command again. Example:
+
+      git checkout -b <new-branch-name>
+
+    HEAD is now at 16889ba... Revert "Repo: fall back to http, ..."
     """
     cmd = ['checkout']
     if quiet:
