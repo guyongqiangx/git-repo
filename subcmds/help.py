@@ -23,6 +23,24 @@ from color import Coloring
 from command import PagedCommand, MirrorSafeCommand, GitcAvailableCommand, GitcClientCommand
 import gitc_utils
 
+"""
+$ repo help help
+
+Summary
+-------
+Display detailed help on a command
+
+Usage: repo help [--all|command]
+
+Options:
+  -h, --help  show this help message and exit
+  -a, --all   show the complete list of commands
+
+Description
+-----------
+Displays detailed usage information about a command.
+
+"""
 class Help(PagedCommand, MirrorSafeCommand):
   common = False
   helpSummary = "Display detailed help on a command"
