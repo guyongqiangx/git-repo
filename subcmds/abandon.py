@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2008 The Android Open Source Project
 #
@@ -19,6 +20,23 @@ from command import Command
 from git_command import git
 from progress import Progress
 
+"""
+$ repo help abandon
+
+Summary
+-------
+Permanently abandon a development branch
+
+Usage: repo abandon <branchname> [<project>...]
+
+This subcommand permanently abandons a development branch by
+deleting it (and all its history) from your local repository.
+
+It is equivalent to "git branch -D <branchname>".
+
+Options:
+  -h, --help  show this help message and exit
+"""
 class Abandon(Command):
   common = True
   helpSummary = "Permanently abandon a development branch"
@@ -31,10 +49,17 @@ deleting it (and all its history) from your local repository.
 It is equivalent to "git branch -D <branchname>".
 """
 
+  """
+  'repo abandon'命令中'abandon'操作的主函数。
+  """
   def Execute(self, opt, args):
     if not args:
       self.Usage()
 
+    """
+    nb为命令中的<branchname>
+    命令: 'git check-ref-format heads/$nb'
+    """
     nb = args[0]
     if not git.check_ref_format('heads/%s' % nb):
       print("error: '%s' is not a valid name" % nb, file=sys.stderr)
@@ -45,6 +70,10 @@ It is equivalent to "git branch -D <branchname>".
     success = []
     all_projects = self.GetProjects(args[1:])
 
+    """
+    根据传入的[<project>...]选项调用GetProjects()进行projects筛选，返回满足条件的projects，结果存放到all_projects中。
+    对满足条件的all_projects进行遍历，逐个调用AbandonBranch(nb)操作
+    """
     pm = Progress('Abandon %s' % nb, len(all_projects))
     for project in all_projects:
       pm.update()
@@ -57,6 +86,12 @@ It is equivalent to "git branch -D <branchname>".
           err.append(project)
     pm.end()
 
+    """
+    前面abandon操作得到2个项目列表，操作成功的project存入success列表，失败的project存到err列表
+
+    如果err列表不为空，则说明有project进行abandon操作失败，显示操作失败的project。
+    如果err和success列表都为空，说明abandon的分支在当前的工作目录下不存在。
+    """
     if err:
       for p in err:
         print("error: %s/: cannot abandon %s" % (p.relpath, nb),
