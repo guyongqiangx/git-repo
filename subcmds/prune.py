@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2008 The Android Open Source Project
 #
@@ -17,6 +18,18 @@ from __future__ import print_function
 from color import Coloring
 from command import PagedCommand
 
+"""
+$ repo help prune
+
+Summary
+-------
+Prune (delete) already merged topics
+
+Usage: repo prune [<project>...]
+
+Options:
+  -h, --help  show this help message and exit
+"""
 class Prune(PagedCommand):
   common = True
   helpSummary = "Prune (delete) already merged topics"
@@ -24,7 +37,14 @@ class Prune(PagedCommand):
 %prog [<project>...]
 """
 
+  """
+  'repo prune'命令中'prune'操作的主函数。
+  """
   def Execute(self, opt, args):
+    """
+    根据传入的[<project>...]选项调用GetProjects()进行projects筛选，
+    遍历筛选结果，对项目逐个调用PruneHeads()操作，然后将操作结果存放到all_branches中
+    """
     all_branches = []
     for project in self.GetProjects(args):
       all_branches.extend(project.PruneHeads())
