@@ -137,7 +137,8 @@ class DownloadedChange(object):
   """
   .commits 属性
 
-  命令：
+  命令： 'git rev-list --abbrev=8 --abbrev-commit
+                       --pretty=oneline --reverse --date-order ^$base $commit --'
   """
   @property
   def commits(self):
@@ -165,6 +166,12 @@ class ReviewableBranch(object):
   def name(self):
     return self.branch.name
 
+  """
+  .commits 属性
+
+  命令： 'git rev-list --abbrev=8 --abbrev-commit
+                       --pretty=oneline --reverse --date-order ^$base refs/heads/$name --'
+  """
   @property
   def commits(self):
     if self._commit_cache is None:
@@ -178,6 +185,11 @@ class ReviewableBranch(object):
                                                           '--')
     return self._commit_cache
 
+  """
+  .unabbrev_commits 属性
+
+  命令： 'git rev-list $base refs/heads/$name --'
+  """
   @property
   def unabbrev_commits(self):
     r = dict()
@@ -187,6 +199,11 @@ class ReviewableBranch(object):
       r[commit[0:8]] = commit
     return r
 
+  """
+  .date 属性
+
+  命令： 'git log --pretty=format:%cd -n 1 refs/heads/$name --'
+  """
   @property
   def date(self):
     return self.project.bare_git.log('--pretty=format:%cd',
@@ -206,6 +223,9 @@ class ReviewableBranch(object):
 
   def GetPublishedRefs(self):
     refs = {}
+    """
+    命令: 'git ls-remote $SshReviewUrl refs/changes/*'
+    """
     output = self.project.bare_git.ls_remote(
         self.branch.remote.SshReviewUrl(self.project.UserEmail),
         'refs/changes/*')
@@ -1022,7 +1042,7 @@ class Project(object):
     return self.config.GetRemote(name)
 
   """
-  返回'.git/config'中名为name的branch对象
+  返回'.git/config'中名为$name的Branch对象
   如：
   $ cat .git/config
   ...
@@ -1584,13 +1604,17 @@ class Project(object):
       return self.revisionId
 
     rem = self.GetRemote(self.remote.name)
+    """
+    将revisionExpr指定的版本引用(revisionExpr)转换为remote源的本地跟踪分支引用
+    例如:rem.ToLocal(rev='stable')，返回'refs/remote/origin/stable'分支引用
+    """
     rev = rem.ToLocal(self.revisionExpr)
 
     if all_refs is not None and rev in all_refs:
       return all_refs[rev]
 
     """
-    执行：'git rev-parse --verify rev^0'
+    执行：'git rev-parse --verify $rev^0'
     获取完整的提交id
     """
     try:
@@ -1795,22 +1819,21 @@ class Project(object):
 # Branch Management ##
 
   """
+  调用StartBranch(name)切换到名为$name的分支上
+
+  以StartBranch('default')为例，有3种情况:
+  1. 分支存在，且当前刚好在default分支上
+  2. 分支存在，但当前不在default分支上
+  3. 分支不存在，需要通过'git checkout -b'操作新建default分支并切换到该分支上
   """
   def StartBranch(self, name, branch_merge=''):
     """Create a new branch off the manifest's revision.
     """
     """
-    如果没有指定branch_merge，则使用revisionExpr
+    如果没有指定$branch_merge，默认$branch_merge为revisionExpr
 
-    如果当前库已经存在名为'name'分支时，有两种情况:
-
-    1. 当前就在$name分支，直接返回
-    读取'.git/HEAD'得到当前指向的分支或提交id，如果HEAD='refs/heads/$name'，表明当前恰好位于name分支。
-    什么都不做，直接返回。
-
-    2. 当前不在$name分支，直接切换到该分支
-    如果存在'refs/heads/$name'引用，说明当前库已经存在该分支，直接切换到该分支。
-    命令：'git checkout $name --'
+    检查head引用，如果head引用为'refs/heads/$name'，说明当前刚好位于$name分支上，直接返回。
+    例如调用StartBranch('default')，如果当前head为'refs/heads/default'就什么都不用做。
     """
     if not branch_merge:
       branch_merge = self.revisionExpr
@@ -1818,6 +1841,13 @@ class Project(object):
     if head == (R_HEADS + name):
       return True
 
+    """
+    前面是刚好位于$name分支的情况，对于不在$name分支上，有两种情况：
+    1. $name分支存在
+    2. $name分支不存在
+
+    如果存在名为$name的分支(即'refs/heads/$name'引用存在)，执行命令: 'git checkout $name --'
+    """
     all_refs = self.bare_ref.all
     if R_HEADS + name in all_refs:
       return GitCommand(self,
@@ -1825,9 +1855,19 @@ class Project(object):
                         capture_stdout=True,
                         capture_stderr=True).Wait() == 0
 
+    """
+    如果不存在名为$name的分支(即'refs/heads/$name'引用不存在)，则按属性创建$name分支并切换过去:
+    1) 获取名为$name的分支对象branch
+    2) 设置branch的remote属性为$remote.name
+    3) 设置branch的merge属性为$branch_merge
+    """
     branch = self.GetBranch(name)
     branch.remote = self.GetRemote(self.remote.name)
     branch.merge = branch_merge
+    """
+    如果branch的merge属性不是'refs/xxx'或者40位commit id的格式，将其设置为'refs/heads/$branch_merge'格式
+    例如：$branch_merge='default'，则branch.merge='refs/heads/default'
+    """
     if not branch.merge.startswith('refs/') and not ID_RE.match(branch_merge):
       branch.merge = R_HEADS + branch_merge
     revid = self.GetRevisionId(all_refs)
@@ -1838,6 +1878,14 @@ class Project(object):
       except KeyError:
         head = None
     if revid and head and revid == head:
+      """
+      假设$name='default'，依次执行以下操作更新'default'分支和HEAD引用:
+      1. 设置 ref='/path/to/test/.git/refs/heads/default'
+      2. 'mkdir /path/to/test/.git/refs/heads'
+      3. 更新'default'分支引用: 'echo $revid > /path/to/test/.git/refs/heads/default'
+      4. 更新HEAD引用，指向'default'分支: 'echo refs/heads/default > .git/HEAD'
+      5. 保存'default'分支的设置到'.git/config'文件中
+      """
       ref = os.path.join(self.gitdir, R_HEADS + name)
       try:
         os.makedirs(os.path.dirname(ref))
@@ -1849,6 +1897,9 @@ class Project(object):
       branch.Save()
       return True
 
+    """
+    命令: 'git checkout -b $branch.name $revid'
+    """
     if GitCommand(self,
                   ['checkout', '-b', branch.name, revid],
                   capture_stdout=True,
