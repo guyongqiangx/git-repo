@@ -123,7 +123,18 @@ class _GitCall(object):
     return _git_version
 
   """
-  将_GitCall对象的属性转换为相应命令来执行
+  __getattr__(self, name) 方法在属性name不存在的时候被调用.
+  这里通过__getattr__将_GitCall对象的属性转换为相应命令来执行, 该操作返回一个包装器函数func,
+  例如对"xxx-yyy"命令的调用为: git.xxx_yyy(cmdv) --> func(cmdv) --> "git xxx-yyy cmdv"
+
+  例如: ./project.py: self.bare_git.rev_parse('FETCH_HEAD'))
+    - git.rev_parse返回一个函数func,
+    - 执行git.rev_parse('FETCH_HEAD')相当于执行函数func('FETCH_HEAD'),
+    - func('FETCH_HEAD')函数执行git命令"git rev-parse FETCH_HEAD"
+  例如: ./project.py: self.bare_git.pack_refs('--all', '--prune')
+    - git.pack_refs返回一个函数func,
+    - 执行git.pack_refs('--all', '--prune')相当于执行函数func('--all', '--prune')
+    - func('--all', '--prune')函数执行git命令"git pack-refs --all --prune"
   """
   def __getattr__(self, name):
     name = name.replace('_','-')
