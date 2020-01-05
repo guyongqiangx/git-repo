@@ -57,8 +57,13 @@ It is equivalent to "git branch -D <branchname>".
       self.Usage()
 
     """
-    nb为命令中的<branchname>
-    命令: 'git check-ref-format heads/$nb'
+    nb(name of branch的缩写?)为命令中的<branchname>参数
+    执行命令: 'git check-ref-format heads/$nb'
+    使用传入的分支名称nb，构建名为heads/$nb的引用，通过'git check-ref-format heads/$nb'确保该引用(名为nb的分支)符合规范。
+    参考: https://git-scm.com/docs/git-check-ref-format
+    $ git check-ref-format @    # 这里'@'不符合引用规范
+    $ echo $?
+    1
     """
     nb = args[0]
     if not git.check_ref_format('heads/%s' % nb):
