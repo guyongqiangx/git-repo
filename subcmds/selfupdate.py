@@ -82,11 +82,17 @@ need to be performed by an end-user.
       _PostRepoUpgrade(self.manifest)
 
     else:
+      '''
+      调用Sync_NetworkHalf，将远程数据抓fetch到本地库，但不影响工作目录和分支状态
+      '''
       if not rp.Sync_NetworkHalf():
         print("error: can't update repo", file=sys.stderr)
         sys.exit(1)
 
       rp.bare_git.gc('--auto')
+      '''
+      使用前面Sync_NetworkHalf(fetch)拿到的数据更新repo自身库的工作目录
+      '''
       _PostRepoFetch(rp,
                      no_repo_verify = opt.no_repo_verify,
                      verbose = True)

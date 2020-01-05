@@ -1449,6 +1449,8 @@ class Project(object):
 
   """
   Sync_NetworkHalf()操作执行网络IO部分的同步工作，不影响本地工作目录和分支状态
+
+  核心是调用_RemoteFetch操作从远程fetch数据到本地
   """
   def Sync_NetworkHalf(self,
                        quiet=False,
@@ -2047,7 +2049,7 @@ class Project(object):
 
     """
     如果当前不在要删除的name分支上，则直接对name分支执行删除操作
-    命令: 'git branch -D $name'
+    执行命令: 'git branch -D $name'
     """
     return GitCommand(self,
                       ['branch', '-D', name],
