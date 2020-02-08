@@ -828,7 +828,10 @@ later is required to fix a server side protocol bug.
       self.manifest.manifestProject.worktree, smart_sync_manifest_name)
 
     """
-    'repo init'操作中有指定'-s'/'-t'参数时，使用'smart_sync'或'smart_tag'的方式同步。
+    'repo init'操作中有指定'-s'/'-t'参数时，使用'smart_sync'或'smart_tag'的方式同步，很少使用。
+    使用'-s'/'-t'操作的前提是需要保存清单库的服务器实现以下两个RPC调用:
+    1. GetApprovedManifest(branch, target), 该调用返回一个基于branch和target的清单文件，每个项目都指向一个正常的版本
+    2. GetManifest(tag), 该调用返回一个指定tag的清单文件，每个项目该tag对应的版本
     """
     if opt.smart_sync or opt.smart_tag:
       if not self.manifest.manifest_server:
@@ -1036,6 +1039,10 @@ later is required to fix a server side protocol bug.
       更新'.repo/repo'库的工作目录
       """
       _PostRepoFetch(rp, opt.no_repo_verify)
+
+      """
+      如果只进行网络部分操作，则到此结束
+      """
       if opt.network_only:
         # bail out now; the rest touches the working tree
         return
@@ -1060,7 +1067,9 @@ later is required to fix a server side protocol bug.
           break
         previously_missing_set = missing_set
         fetched.update(self._Fetch(missing, opt))
-
+    """
+    如果当前是镜像仓库, 到此结束, 不再进行工作区(working tree)的处理
+    """
     if self.manifest.IsMirror or self.manifest.IsArchive:
       # bail out now, we have no working tree
       return
