@@ -40,7 +40,97 @@ class ForallColoring(Coloring):
     Coloring.__init__(self, config, 'forall')
     self.project = self.printer('project', attr='bold')
 
+"""
+$ repo help forall
 
+Summary
+-------
+Run a shell command in each project
+
+Usage: repo forall [<project>...] -c <command> [<arg>...]
+repo forall -r str1 [str2] ... -c <command> [<arg>...]"
+
+Options:
+  -h, --help            show this help message and exit
+  -r, --regex           Execute the command only on projects matching regex or
+                        wildcard expression
+  -i, --inverse-regex   Execute the command only on projects not matching
+                        regex or wildcard expression
+  -g GROUPS, --groups=GROUPS
+                        Execute the command only on projects matching the
+                        specified groups
+  -c, --command         Command (and arguments) to execute
+  -e, --abort-on-errors
+                        Abort if a command exits unsuccessfully
+
+  Output:
+    -p                  Show project headers before output
+    -v, --verbose       Show command error messages
+    -j JOBS, --jobs=JOBS
+                        number of commands to execute simultaneously
+
+Description
+-----------
+Executes the same shell command in each project.
+
+The -r option allows running the command only on projects matching regex
+or wildcard expression.
+
+Output Formatting
+-----------------
+The -p option causes 'repo forall' to bind pipes to the command's stdin,
+stdout and stderr streams, and pipe all output into a continuous stream
+that is displayed in a single pager session. Project headings are
+inserted before the output of each command is displayed. If the command
+produces no output in a project, no heading is displayed.
+
+The formatting convention used by -p is very suitable for some types of
+searching, e.g. `repo forall -p -c git log -SFoo` will print all commits
+that add or remove references to Foo.
+
+The -v option causes 'repo forall' to display stderr messages if a
+command produces output only on stderr. Normally the -p option causes
+command output to be suppressed until the command produces at least one
+byte of output on stdout.
+
+Environment
+-----------
+pwd is the project's working directory. If the current client is a
+mirror client, then pwd is the Git repository.
+
+REPO_PROJECT is set to the unique name of the project.
+
+REPO_PATH is the path relative the the root of the client.
+
+REPO_REMOTE is the name of the remote system from the manifest.
+
+REPO_LREV is the name of the revision from the manifest, translated to a
+local tracking branch. If you need to pass the manifest revision to a
+locally executed git command, use REPO_LREV.
+
+REPO_RREV is the name of the revision from the manifest, exactly as
+written in the manifest.
+
+REPO_COUNT is the total number of projects being iterated.
+
+REPO_I is the current (1-based) iteration count. Can be used in
+conjunction with REPO_COUNT to add a simple progress indicator to your
+command.
+
+REPO__* are any extra environment variables, specified by the
+"annotation" element under any project element. This can be useful for
+differentiating trees based on user-specific criteria, or simply
+annotating tree details.
+
+shell positional arguments ($1, $2, .., $#) are set to any arguments
+following <command>.
+
+Unless -p is used, stdin, stdout, stderr are inherited from the terminal
+and are not redirected.
+
+If -e is used, when a command exits unsuccessfully, 'repo forall' will
+abort without iterating through the remaining projects.
+"""
 class Forall(Command, MirrorSafeCommand):
   common = False
   helpSummary = "Run a shell command in each project"
