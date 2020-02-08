@@ -135,6 +135,9 @@ This is similar to running: repo forall -c 'echo "$REPO_PATH : $REPO_PROJECT"'.
 
     """
     将按照条件查找得到的project按格式整理存放到lines列表中，用于格式化输出。
+    1. 只输出name
+    2. 只输出path
+    3. 同时输出path和name ("path : name")
     """
     lines = []
     for project in projects:
