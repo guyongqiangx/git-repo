@@ -24,6 +24,24 @@ import gitc_utils
 from progress import Progress
 from project import SyncBuffer
 
+"""
+$ repo help start
+
+Summary
+
+Start a new branch for development
+
+Usage: repo start <newbranchname> [--all | <project>...]
+
+Options:
+  -h, --help            show this help message and exit
+  --all                 begin branch in all projects
+
+Description
+
+'repo start' begins a new branch of development, starting from the
+revision specified in the manifest.
+"""
 class Start(Command):
   common = True
   helpSummary = "Start a new branch for development"
@@ -44,11 +62,19 @@ revision specified in the manifest.
     if not args:
       self.Usage()
 
+    """
+    执行命令: git check-ref-format heads/$nb
+    使用传入的分支名称nb，构建名为heads/$nb的引用，通过'git check-ref-format heads/$nb'确保该引用(名为nb的分支)符合规范。
+    """
     nb = args[0]
     if not git.check_ref_format('heads/%s' % nb):
       print("error: '%s' is not a valid name" % nb, file=sys.stderr)
       sys.exit(1)
 
+    """
+    默认为所有项目 opt.all=true
+    如果不是所有项目，根据参数获取项目列表
+    """
     err = []
     projects = []
     if not opt.all:
@@ -78,6 +104,9 @@ revision specified in the manifest.
       if not os.path.exists(os.getcwd()):
         os.chdir(self.manifest.topdir)
 
+    """
+    对列表中的项目逐个进行StartBranch操作, 创建并切换到为名为$nb的分支上
+    """
     pm = Progress('Starting %s' % nb, len(all_projects))
     for project in all_projects:
       pm.update()
