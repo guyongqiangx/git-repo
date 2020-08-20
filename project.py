@@ -876,6 +876,10 @@ class Project(object):
     self.relpath = relpath
     self.revisionExpr = revisionExpr
 
+    """
+    对于revision为commit id的project节点，直接将revisionID=revisionExpr, 即${project.revision}
+    <project path="linux" name="linaro-swg/linux.git" revision="221a1acee8047ae65c2d5980e3a7c5f73362c59d" />
+    """
     if revisionId is None \
             and revisionExpr \
             and IsId(revisionExpr):
@@ -1606,7 +1610,11 @@ class Project(object):
                                          (self.revisionExpr, self.name))
 
   """
-  直接返回revisionId或获取revisionExpr对应的完整的提交id
+  直接返回revisionId或获取revisionExpr(project节点的revision属性)对应的完整的提交id
+  revisionExpr = ${project.revision}
+  <project path="optee_os" name="OP-TEE/optee_os.git"  revision="master" />
+  <project path="qemu"     name="qemu/qemu.git"        revision="refs/tags/v2.12.0" />
+  <project path="linux"    name="linaro-swg/linux.git" revision="221a1acee8047ae65c2d5980e3a7c5f73362c59d" />
   """
   def GetRevisionId(self, all_refs=None):
     if self.revisionId:
@@ -2852,7 +2860,9 @@ class Project(object):
   def _InitGitDir(self, mirror_git=None, force_sync=False):
     """
     当第二次对一个git库调用_InitGitDir()时，
-    gitdir和objdir都已经存在，所以init_git_dir和init_obj.dir都为False。
+    gitdir: '.repo/projects/${project.path}.git'
+    objdir: '.repo/project-objects/${project.name}.git'
+    此时gitdir和objdir都已经存在，所以init_git_dir和init_obj.dir都为False
     此时_InitGitDir()里基本上没有太多操作。
     """
     init_git_dir = not os.path.exists(self.gitdir)
@@ -2897,7 +2907,7 @@ class Project(object):
 
       if init_git_dir:
         """
-        检查'.repo/manifests/.git/config'的'repo.reference'属性，提取本地镜像的路径到ref_dir。
+        检查manifest库配置文件'.git/config'的'repo.reference'属性，提取本地镜像的路径到ref_dir。
         """
         mp = self.manifest.manifestProject
         ref_dir = mp.config.GetString('repo.reference') or ''
