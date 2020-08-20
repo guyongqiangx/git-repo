@@ -864,6 +864,13 @@ class Project(object):
                        fetch from the remote if the sha1 is not present locally.
       old_revision: saved git commit id for open GITC projects.
     """
+
+    """
+    3个重要的路径:
+      gitdir: '.repo/projects/${project.path}.git'
+      objdir: '.repo/project-objects/${project.name}.git'
+    worktree: '${project.path}'
+    """
     self.manifest = manifest
     self.name = name
     self.remote = remote
@@ -874,6 +881,9 @@ class Project(object):
     else:
       self.worktree = None
     self.relpath = relpath
+    """
+    revisionExpr为project节点的revision属性, 即: revisionExpr = ${project.revision}
+    """
     self.revisionExpr = revisionExpr
 
     """
@@ -909,8 +919,13 @@ class Project(object):
                                           defaults=self.manifest.globalConfig)
 
     """
-    对每一个gitdir：
+    对每一个project有3个对应的git库：
     - 初始化3个可操作的Git库对象(work_git, bare_git和bare_objdir)，用于操作其引用和各种属性。
+      - 关于库的路径:
+        -    work_git: '.repo/projects/${project.path}.git'对应的库对象(bare=False)
+        -    bare_git: '.repo/projects/${project.path}.git'对应的库对象(bare=True)
+        - bare_objdir: '.repo/project-objects/${project.name}.git'对应的库对象(bare=True)
+
       - 3个可操作的Git库对象唯一的差别在于bare属性:
       - 对于bare库，引用位于当前目录下;
       - 对于非bare库，引用位于其'.git'目录下
@@ -937,7 +952,9 @@ class Project(object):
   """
   指示当前project是否存在
 
-  检查gitdir和objdir是否存在，如果二者都存在才确认当前project存在
+  只有当以下两个目录都存在时project才存在：
+  gitdir: '.repo/projects/${project.path}.git'
+  objdir: '.repo/project-objects/${project.name}.git'
   """
   @property
   def Exists(self):
