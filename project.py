@@ -61,6 +61,7 @@ else:
 
 """
 往path指定的文件中写入内容content
+相当于: 'echo $content > $path'
 """
 def _lwrite(path, content):
   lock = '%s.lock' % path
@@ -300,10 +301,19 @@ class _CopyFile(object):
     self.abs_src = abssrc
     self.abs_dest = absdest
 
+  """
+  copyfile节点具体的copy操作
+  """
   def _Copy(self):
     src = self.abs_src
     dest = self.abs_dest
     # copy file if it does not exist or is out of date
+    """
+    如果目标文件不存在，或者跟源文件不一致时，此时需要进行copy操作
+    1. 删除原有的目标文件
+    2. 如果目标文件的目录不存在则创建目标文件所在的目录
+    3. 执行copy操作，更新文件权限
+    """
     if not os.path.exists(dest) or not filecmp.cmp(src, dest):
       try:
         # remove existing file first, since it might be read-only
@@ -367,6 +377,9 @@ class _LinkFile(object):
       except IOError:
         _error('Cannot link file %s to %s', relSrc, absDest)
 
+  """
+  linkfile节点具体的link操作
+  """
   def _Link(self):
     """Link the self.rel_src_to_dest and self.abs_dest. Handles wild cards
     on the src linking all of the files in the source in to the destination
@@ -1602,6 +1615,9 @@ class Project(object):
   def PostRepoUpgrade(self):
     self._InitHooks()
 
+  """
+  依次执行copyfiles和linkfiles成员的_Copy()和_Link()操作
+  """
   def _CopyAndLinkFiles(self):
     if self.manifest.isGitcClient:
       return
@@ -1673,6 +1689,9 @@ class Project(object):
       self._FastForward(revid)
       self._CopyAndLinkFiles()
 
+    """
+    取得HEAD引用指向的分支branch和具体的提交对象(head)
+    """
     head = self.work_git.GetHead()
     if head.startswith(R_HEADS):
       branch = head[len(R_HEADS):]
@@ -3404,14 +3423,15 @@ class Project(object):
         p.Wait()
 
     """
-    读取'.git/HEAD'文件，并返回其指向的分支或提交id
-    例如：返回'refs/heads/stable'或'fa2ff85933d90139bf0340bd6dda4331effbe4ee'
+    返回'.git/HEAD'文件的内容。
+
+    有两种情况:
+    1. 分支引用，如'refs/heads/stable'
+    2. 详细的commit id(头指针分离状态)，如'fa2ff85933d90139bf0340bd6dda4331effbe4ee'
     """
     def GetHead(self):
       """
-      构造HEAD文件的路径: '.git/HEAD'
-
-      然后读取HEAD文件的内容，有两种情况：
+      然后读取'.git/HEAD'文件的内容，有两种情况：
 
       1. 指向某个分支引用
       $ cat .git/HEAD
@@ -3451,11 +3471,11 @@ class Project(object):
       return line[:-1]
 
     """
-    设置HEAD引用，指向给定的分支ref
+    设置HEAD引用，使其指向名为ref的分支引用
     """
     def SetHead(self, ref, message=None):
       """
-      构造并执行命令：'git symbolic-ref -m message HEAD ref'
+      构造并执行命令：'git symbolic-ref -m message HEAD $ref'
 
       例如这里的HEAD原来指向stable分支，使用'symbolic-ref'将HEAD指向新的comments分支:
       $ cat .git/HEAD
